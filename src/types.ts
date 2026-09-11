@@ -226,6 +226,7 @@ export interface PenilaianPraktik {
   materiJudul?: string;
   muridId: string;
   muridNama: string;
+  nis?: string;
   tanggal: string;
   statusPublikasi?: 'Publish' | 'Draft';
   indikatorPenilaian?: IndikatorPraktik[];

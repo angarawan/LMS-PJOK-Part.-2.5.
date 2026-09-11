@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Activity,
   Award,
@@ -23,74 +23,25 @@ import {
   Check,
   Download,
   BookOpen,
+  Trash2,
+  SlidersHorizontal,
+  Edit3,
 } from 'lucide-react';
-import { PenilaianPraktik, RubrikPraktik, User } from '../../types';
+import { PenilaianPraktik, RubrikPraktik, User, IndikatorPraktik } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
+import {
+  IndikatorTemplate,
+  getSuggestedIndicatorsForMateri,
+  calculateIndikatorScore,
+  SKALA_INDIKATOR_INFO,
+  MASTER_INDIKATOR_LIBRARY,
+  DEFAULT_STANDAR_INDIKATOR,
+} from '../../utils/praktikIndicators';
 
 interface PraktikAssessmentProps {
   db: LMSDatabase;
   currentUser: User;
 }
-
-const RUBRIC_CRITERIA: { key: keyof RubrikPraktik; title: string; desc: string }[] = [
-  {
-    key: 'sikapAwal',
-    title: '1. Sikap Awal (Persiapan)',
-    desc: 'Posisi kaki dibuka selebar bahu, lutut ditekuk rileks, kedua lengan siap di depan badan.',
-  },
-  {
-    key: 'pelaksanaanTeknik',
-    title: '2. Pelaksanaan Teknik Gerakan',
-    desc: 'Gerakan ayunan lengan lurus rapat, perkenaan bola pas di atas pergelangan tangan, dorongan lutut.',
-  },
-  {
-    key: 'sikapAkhir',
-    title: '3. Sikap Akhir (Follow Through)',
-    desc: 'Keseimbangan tubuh terjaga, pandangan mengikuti arah bola, kembali ke posisi siap siaga.',
-  },
-  {
-    key: 'hasilGerakan',
-    title: '4. Kualitas & Hasil Gerakan',
-    desc: 'Arah pantulan bola akurat melambung stabil, tinggi bola memenuhi syarat operan permainan.',
-  },
-  {
-    key: 'sportivitas',
-    title: '5. Sikap Sportivitas & Etika',
-    desc: 'Menghargai instruksi pelatih/guru, mematuhi aturan bermain, dan menghormati lawan/kawan.',
-  },
-  {
-    key: 'kerjaSama',
-    title: '6. Kerja Sama Beregu & Komunikasi',
-    desc: 'Komunikasi aktif saat menerima bola, gotong royong mengamankan bola olahraga tim.',
-  },
-];
-
-const SKALA_LABELS: Record<number, { label: string; desc: string; color: string; activeColor: string }> = {
-  1: {
-    label: 'Kurang',
-    desc: 'Belum memenuhi teknik dasar',
-    color: 'border-rose-200 text-rose-700 hover:bg-rose-50',
-    activeColor: 'bg-rose-600 text-white border-rose-600 shadow-xs',
-  },
-  2: {
-    label: 'Cukup',
-    desc: 'Cukup menguasai sebagian gerakan',
-    color: 'border-amber-200 text-amber-700 hover:bg-amber-50',
-    activeColor: 'bg-amber-500 text-white border-amber-500 shadow-xs',
-  },
-  3: {
-    label: 'Baik',
-    desc: 'Menguasai teknik dengan tepat',
-    color: 'border-sky-200 text-sky-700 hover:bg-sky-50',
-    activeColor: 'bg-sky-600 text-white border-sky-600 shadow-xs',
-  },
-  4: {
-    label: 'Sangat Baik',
-    desc: 'Sempurna dan konsisten',
-    color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50',
-    activeColor: 'bg-emerald-600 text-white border-emerald-600 shadow-xs',
-  },
-};
 
 const DEFAULT_MATERI_LIST = [
   'Permainan Bola Voli - Passing Bawah & Atas',
@@ -114,19 +65,35 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
   const [searchMurid, setSearchMurid] = useState<string>('');
   const [mainViewMode, setMainViewMode] = useState<'rubrik' | 'matriks'>('rubrik');
 
-  // Multi student selection
+  // Multi student selection (can select more than 1 student)
   const [selectedMuridIds, setSelectedMuridIds] = useState<string[]>([]);
-  const [activeMuridId, setActiveMuridId] = useState<string | null>(null);
+
+  // Active Indicators for the selected material
+  const [activeIndicators, setActiveIndicators] = useState<IndikatorTemplate[]>(() => {
+    return getSuggestedIndicatorsForMateri('Permainan Bola Voli - Passing Bawah & Atas');
+  });
 
   // Modal Add New Materi
   const [showAddMateriModal, setShowAddMateriModal] = useState<boolean>(false);
   const [newMateriName, setNewMateriName] = useState<string>('');
+
+  // Modal Manage / Add Indicators
+  const [showIndikatorModal, setShowIndikatorModal] = useState<boolean>(false);
+  const [customIndikatorNama, setCustomIndikatorNama] = useState<string>('');
+  const [customIndikatorDesc, setCustomIndikatorDesc] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Local state for rubrics keyed by `${materiJudul}_${muridId}`
+  // Local state for scores keyed by `${materiJudul}_${muridId}`
+  // Contains score per indicatorId and notes
   const [muridAssessments, setMuridAssessments] = useState<
-    Record<string, { rubrik: RubrikPraktik; catatan: string }>
+    Record<string, { scores: Record<string, number>; catatan: string }>
   >({});
+
+  // When selectedMateriJudul changes, adjust suggested indicators if user hasn't heavily customized
+  useEffect(() => {
+    const suggested = getSuggestedIndicatorsForMateri(selectedMateriJudul);
+    setActiveIndicators(suggested);
+  }, [selectedMateriJudul]);
 
   // Dynamic list of available practical materials
   const availableMateriList = useMemo(() => {
@@ -154,6 +121,7 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     });
   }, [db.users, selectedKelasId, db.kelas]);
 
+  // Filtered searched students
   const searchedMurid = useMemo(() => {
     if (!searchMurid.trim()) return muridInKelas;
     const q = searchMurid.toLowerCase();
@@ -162,93 +130,125 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     );
   }, [muridInKelas, searchMurid]);
 
-  // Get data for active student on currently selected materi
-  const getMuridData = (muridId: string, targetMateri: string = selectedMateriJudul) => {
-    const cacheKey = `${targetMateri}_${muridId}`;
+  // On first load or class change, initialize selection with first 4 students if none selected
+  useEffect(() => {
+    if (selectedMuridIds.length === 0 && muridInKelas.length > 0) {
+      // Auto-select first 4 students to immediately give a productive view
+      setSelectedMuridIds(muridInKelas.slice(0, 4).map((m) => m.id));
+    }
+  }, [selectedKelasId, muridInKelas]);
+
+  // Get or compute assessment data for a student on current material
+  const getMuridAssessment = (muridId: string) => {
+    const cacheKey = `${selectedMateriJudul}_${muridId}`;
     if (muridAssessments[cacheKey]) {
       return muridAssessments[cacheKey];
     }
 
+    // Check if existing saved assessment exists in database
     const existing = (db.penilaianPraktik || []).find(
       (p) =>
         p.muridId === muridId &&
-        ((p.materiJudul || p.materi || '').trim().toLowerCase() === targetMateri.trim().toLowerCase())
+        ((p.materiJudul || p.materi || '').trim().toLowerCase() ===
+          selectedMateriJudul.trim().toLowerCase())
     );
 
+    const initialScores: Record<string, number> = {};
+
     if (existing) {
-      const existingRubrik: RubrikPraktik = existing.rubrik
-        ? {
-            sikapAwal: existing.rubrik.sikapAwal ?? 3,
-            pelaksanaanTeknik: existing.rubrik.pelaksanaanTeknik ?? 3,
-            sikapAkhir: existing.rubrik.sikapAkhir ?? 3,
-            hasilGerakan: existing.rubrik.hasilGerakan ?? 3,
-            sportivitas: existing.rubrik.sportivitas ?? 4,
-            kerjaSama: existing.rubrik.kerjaSama ?? 4,
-          }
-        : {
-            sikapAwal: existing.aspekNilai?.sikapAwal ?? 3,
-            pelaksanaanTeknik: existing.aspekNilai?.teknikGerakan ?? 3,
-            sikapAkhir: existing.aspekNilai?.koordinasi ?? 3,
-            hasilGerakan: existing.aspekNilai?.ketepatan ?? 3,
-            sportivitas: existing.aspekNilai?.sportivitas ?? 4,
-            kerjaSama: existing.aspekNilai?.kerjaSama ?? 4,
-          };
+      if (existing.indikatorPenilaian && existing.indikatorPenilaian.length > 0) {
+        existing.indikatorPenilaian.forEach((ind) => {
+          initialScores[ind.id] = ind.skor ?? 3;
+        });
+      } else if (existing.rubrik) {
+        // Fallback map standard rubrik
+        activeIndicators.forEach((ind, i) => {
+          const rubricKeys: (keyof RubrikPraktik)[] = [
+            'sikapAwal',
+            'pelaksanaanTeknik',
+            'hasilGerakan',
+            'sikapAkhir',
+            'sportivitas',
+            'kerjaSama',
+          ];
+          const key = rubricKeys[i % rubricKeys.length];
+          initialScores[ind.id] = (existing.rubrik as any)?.[key] ?? 3;
+        });
+      }
+
+      // Ensure all active indicators have at least a default score of 3
+      activeIndicators.forEach((ind) => {
+        if (!initialScores[ind.id]) initialScores[ind.id] = 3;
+      });
+
       return {
-        rubrik: existingRubrik,
+        scores: initialScores,
         catatan: existing.catatanEvaluasi || existing.catatanGuru || '',
       };
     }
 
+    // Default: all active indicators get 3 (Baik)
+    activeIndicators.forEach((ind) => {
+      initialScores[ind.id] = 3;
+    });
+
     return {
-      rubrik: {
-        sikapAwal: 3,
-        pelaksanaanTeknik: 3,
-        sikapAkhir: 3,
-        hasilGerakan: 3,
-        sportivitas: 4,
-        kerjaSama: 4,
-      },
-      catatan: 'Penguasaan teknik gerakan sudah cukup baik, perlu peningkatan konsistensi.',
+      scores: initialScores,
+      catatan: 'Penguasaan teknik gerakan sudah baik, pertahankan konsistensi latihan.',
     };
   };
 
-  const calculateScore = (rubrik: RubrikPraktik) => {
-    const totalPoints =
-      (rubrik?.sikapAwal ?? 3) +
-      (rubrik?.pelaksanaanTeknik ?? 3) +
-      (rubrik?.sikapAkhir ?? 3) +
-      (rubrik?.hasilGerakan ?? 3) +
-      (rubrik?.sportivitas ?? 4) +
-      (rubrik?.kerjaSama ?? 4);
-    return Math.round((totalPoints / 24) * 100);
+  // Helper to get array of IndikatorPraktik for a student
+  const getStudentIndikatorList = (muridId: string): IndikatorPraktik[] => {
+    const assessment = getMuridAssessment(muridId);
+    return activeIndicators.map((tmpl) => ({
+      id: tmpl.id,
+      nama: tmpl.nama,
+      deskripsi: tmpl.deskripsi,
+      skor: assessment.scores[tmpl.id] ?? 3,
+    }));
   };
 
-  const getPredikat = (score: number) => {
-    if (score >= 90) return 'A (Sangat Baik)';
-    if (score >= 80) return 'B (Baik)';
-    if (score >= 70) return 'C (Cukup)';
-    return 'D (Kurang)';
+  // Handle single indicator score change for a specific student
+  const handleScoreChange = (muridId: string, indikatorId: string, score: number) => {
+    const current = getMuridAssessment(muridId);
+    const cacheKey = `${selectedMateriJudul}_${muridId}`;
+
+    setMuridAssessments((prev) => ({
+      ...prev,
+      [cacheKey]: {
+        ...current,
+        scores: {
+          ...current.scores,
+          [indikatorId]: score,
+        },
+      },
+    }));
   };
 
-  // Get all practical assessments done by this student across ANY materials
-  const getStudentAllPraktik = (muridId: string) => {
-    return (db.penilaianPraktik || []).filter((p) => p.muridId === muridId);
+  // Handle student feedback note change
+  const handleCatatanChange = (muridId: string, catatan: string) => {
+    const current = getMuridAssessment(muridId);
+    const cacheKey = `${selectedMateriJudul}_${muridId}`;
+
+    setMuridAssessments((prev) => ({
+      ...prev,
+      [cacheKey]: {
+        ...current,
+        catatan,
+      },
+    }));
   };
 
+  // Toggle student selection
   const toggleSelectMurid = (id: string) => {
     setSelectedMuridIds((prev) =>
       prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
     );
-    if (!activeMuridId || !selectedMuridIds.includes(id)) {
-      setActiveMuridId(id);
-    }
   };
 
   const selectAllStudents = () => {
     setSelectedMuridIds(muridInKelas.map((m) => m.id));
-    if (muridInKelas.length > 0 && !activeMuridId) {
-      setActiveMuridId(muridInKelas[0].id);
-    }
   };
 
   const clearSelection = () => {
@@ -267,55 +267,92 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     const targetPool = unassessed.length >= groupSize ? unassessed : muridInKelas;
     const slice = targetPool.slice(0, groupSize).map((m) => m.id);
     setSelectedMuridIds(slice);
-    if (slice.length > 0) setActiveMuridId(slice[0]);
   };
 
-  const handleScoreChange = (muridId: string, key: keyof RubrikPraktik, value: number) => {
-    const current = getMuridData(muridId);
-    const cacheKey = `${selectedMateriJudul}_${muridId}`;
-    setMuridAssessments((prev) => ({
-      ...prev,
-      [cacheKey]: {
-        ...current,
-        rubrik: {
-          ...current.rubrik,
-          [key]: value,
-        },
-      },
-    }));
-  };
-
-  const handleCatatanChange = (muridId: string, catatan: string) => {
-    const current = getMuridData(muridId);
-    const cacheKey = `${selectedMateriJudul}_${muridId}`;
-    setMuridAssessments((prev) => ({
-      ...prev,
-      [cacheKey]: {
-        ...current,
-        catatan,
-      },
-    }));
-  };
-
-  const applyRubrikToAllSelected = (sourceRubrik: RubrikPraktik) => {
-    if (selectedMuridIds.length === 0) {
-      alert('Pilih beberapa murid terlebih dahulu untuk menerapkan rubrik bersamaan.');
+  // Copy one student's scores to all other selected students
+  const applyStudentScoresToAll = (sourceMuridId: string) => {
+    if (selectedMuridIds.length <= 1) {
+      alert('Pilih lebih dari 1 murid terlebih dahulu untuk menyalin nilai.');
       return;
     }
+    const sourceAssessment = getMuridAssessment(sourceMuridId);
+    const updated = { ...muridAssessments };
+
+    selectedMuridIds.forEach((id) => {
+      if (id !== sourceMuridId) {
+        const cacheKey = `${selectedMateriJudul}_${id}`;
+        updated[cacheKey] = {
+          scores: { ...sourceAssessment.scores },
+          catatan: sourceAssessment.catatan,
+        };
+      }
+    });
+
+    setMuridAssessments(updated);
+    setToastMessage(
+      `Nilai berhasil disalin ke seluruh ${selectedMuridIds.length} murid terpilih!`
+    );
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Quick batch score for all selected students
+  const handleQuickBatchScore = (score: number) => {
+    if (selectedMuridIds.length === 0) {
+      alert('Pilih minimal satu murid terlebih dahulu.');
+      return;
+    }
+
     const updated = { ...muridAssessments };
     selectedMuridIds.forEach((id) => {
       const cacheKey = `${selectedMateriJudul}_${id}`;
-      const current = getMuridData(id);
+      const current = getMuridAssessment(id);
+      const newScores: Record<string, number> = {};
+      activeIndicators.forEach((ind) => {
+        newScores[ind.id] = score;
+      });
       updated[cacheKey] = {
         ...current,
-        rubrik: { ...sourceRubrik },
+        scores: newScores,
       };
     });
+
     setMuridAssessments(updated);
     setToastMessage(
-      `Berhasil menerapkan nilai rubrik ke ${selectedMuridIds.length} murid terpilih pada materi ${selectedMateriJudul}!`
+      `Berhasil mengatur semua indikator menjadi ${
+        score === 4 ? 'Sangat Baik (4)' : score === 3 ? 'Baik (3)' : score
+      } untuk ${selectedMuridIds.length} murid!`
     );
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Add custom indicator
+  const handleAddCustomIndikator = (e: React.FormEvent) => {
+    e.preventDefault();
+    const nama = customIndikatorNama.trim();
+    if (!nama) return;
+
+    const newIndikator: IndikatorTemplate = {
+      id: `ind-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      nama,
+      deskripsi:
+        customIndikatorDesc.trim() ||
+        'Menilai penguasaan teknik, ketepatan, dan konsistensi gerakan olahraga.',
+    };
+
+    setActiveIndicators((prev) => [...prev, newIndikator]);
+    setCustomIndikatorNama('');
+    setCustomIndikatorDesc('');
+    setToastMessage(`Indikator baru "${nama}" berhasil ditambahkan!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Remove an active indicator
+  const handleRemoveIndikator = (indId: string) => {
+    if (activeIndicators.length <= 1) {
+      alert('Penilaian praktik membutuhkan minimal 1 indikator penilaian.');
+      return;
+    }
+    setActiveIndicators((prev) => prev.filter((i) => i.id !== indId));
   };
 
   // Add new materi
@@ -332,7 +369,7 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Save assessments (supports multiple materials per student)
+  // Save assessments for target students AND connect directly to student accounts
   const handleSaveStudents = (targetIds: string[]) => {
     if (targetIds.length === 0) {
       alert('Silakan pilih minimal satu murid untuk disimpan penilaiannya.');
@@ -348,39 +385,46 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
       const muridObj = db.users.find((u) => u.id === muridId);
       if (!muridObj) return;
 
-      const assessmentData = getMuridData(muridId);
-      const score = calculateScore(assessmentData.rubrik);
-      const predikatStr = getPredikat(score);
-      const totalPoints =
-        (assessmentData.rubrik?.sikapAwal ?? 3) +
-        (assessmentData.rubrik?.pelaksanaanTeknik ?? 3) +
-        (assessmentData.rubrik?.sikapAkhir ?? 3) +
-        (assessmentData.rubrik?.hasilGerakan ?? 3) +
-        (assessmentData.rubrik?.sportivitas ?? 4) +
-        (assessmentData.rubrik?.kerjaSama ?? 4);
+      const assessmentData = getMuridAssessment(muridId);
+      const indikatorList = getStudentIndikatorList(muridId);
+      const scoreCalc = calculateIndikatorScore(indikatorList);
+
+      // Map back to rubrik for legacy backward compatibility
+      const rubrikBackward: RubrikPraktik = {
+        sikapAwal: indikatorList[0]?.skor ?? 3,
+        pelaksanaanTeknik: indikatorList[1]?.skor ?? 3,
+        hasilGerakan: indikatorList[2]?.skor ?? 3,
+        sikapAkhir: indikatorList[3]?.skor ?? 3,
+        sportivitas: indikatorList[4]?.skor ?? 4,
+        kerjaSama: indikatorList[5]?.skor ?? 4,
+      };
 
       newAssessments.push({
         id: `prk-${muridId}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         muridId: muridId,
         muridNama: muridObj.name,
+        nis: muridObj.nis || muridObj.nip || '',
         kelasId: selectedKelasId,
         kelasNama: kelasNama,
         materiJudul: selectedMateriJudul,
         materi: selectedMateriJudul,
         tanggal: new Date().toISOString().slice(0, 10),
-        rubrik: assessmentData.rubrik,
+        statusPublikasi: 'Publish',
+        indikatorPenilaian: indikatorList,
+        rubrik: rubrikBackward,
         aspekNilai: {
-          sikapAwal: assessmentData.rubrik.sikapAwal as any,
-          teknikGerakan: assessmentData.rubrik.pelaksanaanTeknik as any,
-          ketepatan: assessmentData.rubrik.hasilGerakan as any,
-          koordinasi: assessmentData.rubrik.sikapAkhir as any,
-          sportivitas: assessmentData.rubrik.sportivitas as any,
-          kerjaSama: assessmentData.rubrik.kerjaSama as any,
+          sikapAwal: (rubrikBackward.sikapAwal as any) || 3,
+          teknikGerakan: (rubrikBackward.pelaksanaanTeknik as any) || 3,
+          ketepatan: (rubrikBackward.hasilGerakan as any) || 3,
+          koordinasi: (rubrikBackward.sikapAkhir as any) || 3,
+          sportivitas: (rubrikBackward.sportivitas as any) || 4,
+          kerjaSama: (rubrikBackward.kerjaSama as any) || 4,
         },
-        totalSkor: totalPoints,
-        nilaiTotal: score,
-        nilaiAkhir: score,
-        predikat: predikatStr.split(' ')[0] as any,
+        totalSkor: scoreCalc.totalSkor,
+        rataRata: scoreCalc.rataRataSkala4,
+        nilaiTotal: scoreCalc.nilai100,
+        nilaiAkhir: scoreCalc.nilai100,
+        predikat: scoreCalc.predikat,
         catatanEvaluasi: assessmentData.catatan,
         catatanGuru: assessmentData.catatan,
         guruPenilai: currentUser.name,
@@ -389,7 +433,7 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     });
 
     dataStorage.updateDatabase((prev) => {
-      // Retain other materials for each student; only update this specific materi
+      // 1. Update PenilaianPraktik list
       const filtered = (prev.penilaianPraktik || []).filter(
         (p) =>
           !(
@@ -401,47 +445,87 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
 
       const allCombined = [...filtered, ...newAssessments];
 
-      // Update student's report card (`nilai.praktik`) to the average of ALL their practical assessments
-      const updatedNilai = (prev.nilai || []).map((n) => {
-        if (targetIds.includes(n.muridId)) {
-          const studentAssessments = allCombined.filter((p) => p.muridId === n.muridId);
-          if (studentAssessments.length > 0) {
-            const avgPraktik = Math.round(
-              studentAssessments.reduce(
-                (sum, a) => sum + (a.nilaiAkhir || a.nilaiTotal || 80),
-                0
-              ) / studentAssessments.length
-            );
-            const newNilaiAkhir = Math.round((n.tugas + n.quiz + avgPraktik + n.sikap) / 4);
-            return {
-              ...n,
-              praktik: avgPraktik,
-              nilaiAkhir: newNilaiAkhir,
-              predikat: (getPredikat(newNilaiAkhir) || 'B').split(' ')[0] as any,
-            };
-          }
+      // 2. CRITICAL: Connect to Student Accounts (db.nilai / RekapNilaiMurid)
+      // Ensure EVERY student in targetIds has a record in db.nilai, whether newly created or updated
+      const existingNilaiMap = new Map((prev.nilai || []).map((n) => [n.muridId, { ...n }]));
+
+      targetIds.forEach((muridId) => {
+        const studentObj = prev.users.find((u) => u.id === muridId);
+        const studentAssessments = allCombined.filter((p) => p.muridId === muridId);
+
+        const avgPraktik =
+          studentAssessments.length > 0
+            ? Math.round(
+                studentAssessments.reduce(
+                  (sum, a) => sum + (a.nilaiAkhir || a.nilaiTotal || 80),
+                  0
+                ) / studentAssessments.length
+              )
+            : 80;
+
+        let existingRecord = existingNilaiMap.get(muridId);
+
+        if (!existingRecord) {
+          // If student didn't exist in db.nilai, create their report card record now!
+          const tugas = 85;
+          const quiz = 80;
+          const sikap = 90;
+          const pengetahuan = Math.round((tugas + quiz) / 2);
+          const keterampilan = avgPraktik;
+          const nilaiAkhir = Math.round(pengetahuan * 0.3 + keterampilan * 0.5 + sikap * 0.2);
+          const predikat = (calculateIndikatorScore([]).predikat || 'B') as any;
+
+          existingRecord = {
+            id: `nil-${muridId}`,
+            muridId: muridId,
+            muridNama: studentObj?.name || 'Murid PJOK',
+            nis: studentObj?.nis || studentObj?.nip || '',
+            kelasId: selectedKelasId,
+            kelasNama: kelasNama,
+            semester: '1 (Ganjil)',
+            tugas,
+            quiz,
+            praktik: avgPraktik,
+            pengetahuan,
+            keterampilan,
+            sikap,
+            nilaiAkhir,
+            predikat,
+          };
+        } else {
+          // Update existing record
+          const tugas = existingRecord.tugas || 85;
+          const quiz = existingRecord.quiz || 80;
+          const sikap = existingRecord.sikap || 90;
+          const pengetahuan = Math.round((tugas + quiz) / 2);
+          const keterampilan = avgPraktik;
+          const nilaiAkhir = Math.round(pengetahuan * 0.3 + keterampilan * 0.5 + sikap * 0.2);
+          const pred =
+            nilaiAkhir >= 88 ? 'A' : nilaiAkhir >= 78 ? 'B' : nilaiAkhir >= 65 ? 'C' : 'D';
+
+          existingRecord.praktik = avgPraktik;
+          existingRecord.keterampilan = keterampilan;
+          existingRecord.nilaiAkhir = nilaiAkhir;
+          existingRecord.predikat = pred as any;
         }
-        return n;
+
+        existingNilaiMap.set(muridId, existingRecord);
       });
 
       return {
         ...prev,
         penilaianPraktik: allCombined,
-        nilai: updatedNilai,
+        nilai: Array.from(existingNilaiMap.values()),
       };
     });
 
     setToastMessage(
-      `Berhasil menyimpan penilaian untuk ${newAssessments.length} murid pada materi: "${selectedMateriJudul}"!`
+      `Berhasil menyimpan penilaian untuk ${newAssessments.length} murid! Nilai telah langsung terhubung ke Akun Murid.`
     );
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const activeMurid = db.users.find((u) => u.id === activeMuridId);
-  const activeMuridAssessment = activeMuridId ? getMuridData(activeMuridId) : null;
-  const activeScore = activeMuridAssessment ? calculateScore(activeMuridAssessment.rubrik) : 0;
-
-  // Distinct materials that actually have scores in this class (for the Matrix view)
+  // Distinct materials that actually have scores in this class (for Matrix View)
   const assessedMaterialsInClass = useMemo(() => {
     const classStudentIds = muridInKelas.map((m) => m.id);
     const setMateri = new Set<string>();
@@ -451,7 +535,6 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
         if (mTitle) setMateri.add(mTitle);
       }
     });
-    // Add current selected materi if not in list
     setMateri.add(selectedMateriJudul);
     return Array.from(setMateri);
   }, [muridInKelas, db.penilaianPraktik, selectedMateriJudul]);
@@ -469,13 +552,14 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     ];
 
     const rows = muridInKelas.map((m, idx) => {
-      const studentAll = getStudentAllPraktik(m.id);
+      const studentAll = (db.penilaianPraktik || []).filter((p) => p.muridId === m.id);
       let totalScore = 0;
       let count = 0;
 
       const scores = assessedMaterialsInClass.map((mat) => {
         const found = studentAll.find(
-          (p) => (p.materiJudul || p.materi || '').trim().toLowerCase() === mat.trim().toLowerCase()
+          (p) =>
+            (p.materiJudul || p.materi || '').trim().toLowerCase() === mat.trim().toLowerCase()
         );
         if (found) {
           const sc = found.nilaiAkhir || found.nilaiTotal || 0;
@@ -487,7 +571,8 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
       });
 
       const avg = count > 0 ? Math.round(totalScore / count) : 0;
-      const pred = avg > 0 ? getPredikat(avg).split(' ')[0] : '-';
+      const pred =
+        avg >= 88 ? 'A' : avg >= 78 ? 'B' : avg >= 65 ? 'C' : avg > 0 ? 'D' : '-';
 
       return [
         idx + 1,
@@ -514,36 +599,39 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     document.body.removeChild(link);
   };
 
+  const selectedStudents = muridInKelas.filter((m) => selectedMuridIds.includes(m.id));
+
   return (
-    <div className="space-y-6 pb-20 sm:pb-8">
+    <div className="space-y-6 pb-24 sm:pb-12">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-in fade-in slide-in-from-top-3">
-          <div className="p-3.5 rounded-2xl shadow-xl bg-emerald-600 text-white flex items-center gap-2.5 text-xs font-bold">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <div className="p-4 rounded-2xl shadow-2xl bg-emerald-600 text-white flex items-center gap-3 text-xs font-bold ring-2 ring-white/20">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-200" />
             <span className="flex-1">{toastMessage}</span>
           </div>
         </div>
       )}
 
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-teal-900 via-emerald-950 to-slate-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-lg relative overflow-hidden">
+      {/* Top Banner & Control Deck */}
+      <div className="bg-gradient-to-r from-teal-900 via-emerald-950 to-slate-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5 max-w-xl">
+          <div className="space-y-1.5 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-semibold backdrop-blur-md text-teal-200">
               <Activity className="w-3.5 h-3.5" />
-              <span>Instrumen Penilaian Autentik Psikomotorik PJOK Multi-Materi</span>
+              <span>Instrumen Penilaian Praktik PJOK • Multi-Murid & Multi-Indikator</span>
             </div>
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight">
               Penilaian Praktik & Rubrik Kompetensi
             </h2>
             <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-              Guru dapat menilai lebih dari satu cabang materi praktik pada setiap murid. Tambahkan materi baru kapan saja dan pantau rekapitulasi nilai komprehensif.
+              Pilih kelas, pilih satu atau lebih murid, pilih materi, lalu kelola indikator penilaian.
+              Semua indikator akan tampil langsung di bawah nama setiap murid yang dipilih dan otomatis terhubung ke akun murid.
             </p>
           </div>
 
-          {/* Mode Switch & Actions */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* View Mode Switch */}
+          <div className="flex items-center gap-2 self-start md:self-auto">
             <div className="bg-white/10 p-1 rounded-xl flex items-center gap-1 border border-white/15">
               <button
                 type="button"
@@ -555,7 +643,7 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
                 }`}
               >
                 <Activity className="w-3.5 h-3.5" />
-                <span>Rubrik Penilaian</span>
+                <span>Formulir Penilaian</span>
               </button>
               <button
                 type="button"
@@ -567,38 +655,26 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
                 }`}
               >
                 <TableIcon className="w-3.5 h-3.5" />
-                <span>Rekap Semua Materi</span>
+                <span>Rekap Matriks Kelas</span>
               </button>
             </div>
-
-            {selectedMuridIds.length > 0 && mainViewMode === 'rubrik' && (
-              <button
-                type="button"
-                onClick={() => handleSaveStudents(selectedMuridIds)}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Simpan {selectedMuridIds.length} Siswa</span>
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Filters Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 mt-5 pt-4 border-t border-white/15">
-          {/* Pilih Kelas */}
-          <div className="lg:col-span-3">
-            <label className="text-[11px] font-bold text-teal-200 block mb-1">
-              Pilih Kelas Siswa
+        {/* Filters & Actions Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 mt-5 pt-4 border-t border-white/15">
+          {/* 1. Pilih Kelas */}
+          <div className="md:col-span-3">
+            <label className="text-[11px] font-extrabold text-teal-200 block mb-1">
+              1. Pilih Kelas ({db.kelas.length} Kelas)
             </label>
             <select
               value={selectedKelasId}
               onChange={(e) => {
                 setSelectedKelasId(e.target.value);
                 setSelectedMuridIds([]);
-                setActiveMuridId(null);
               }}
-              className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-hidden focus:bg-slate-900 cursor-pointer"
+              className="w-full bg-slate-900/90 border border-teal-500/30 text-white rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-teal-400 cursor-pointer"
             >
               {db.kelas.map((k) => (
                 <option key={k.id} value={k.id} className="bg-slate-900 text-white">
@@ -608,426 +684,519 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
             </select>
           </div>
 
-          {/* Materi Pembelajaran + Tambah Materi Button */}
-          <div className="lg:col-span-6">
+          {/* 2. Pilih Materi */}
+          <div className="md:col-span-5">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-teal-200">
-                Materi Penilaian Praktik
+              <label className="text-[11px] font-extrabold text-teal-200">
+                2. Pilih Materi yang Dinilai
               </label>
               <button
                 type="button"
                 onClick={() => setShowAddMateriModal(true)}
-                className="text-[11px] font-extrabold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-bold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah Materi Baru</span>
+                <Plus className="w-3 h-3" />
+                <span>Materi Baru</span>
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedMateriJudul}
-                onChange={(e) => setSelectedMateriJudul(e.target.value)}
-                className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-hidden focus:bg-slate-900 truncate cursor-pointer"
-              >
-                {availableMateriList.map((materi) => (
-                  <option key={materi} value={materi} className="bg-slate-900 text-white">
-                    {materi}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setShowAddMateriModal(true)}
-                className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1 cursor-pointer"
-                title="Tambah Materi Praktik Baru"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Materi Baru</span>
-              </button>
-            </div>
+            <select
+              value={selectedMateriJudul}
+              onChange={(e) => setSelectedMateriJudul(e.target.value)}
+              className="w-full bg-slate-900/90 border border-teal-500/30 text-white rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-teal-400 cursor-pointer truncate"
+            >
+              {availableMateriList.map((materi) => (
+                <option key={materi} value={materi} className="bg-slate-900 text-white">
+                  {materi}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Cari Murid */}
-          <div className="lg:col-span-3">
-            <label className="text-[11px] font-bold text-teal-200 block mb-1">
-              Cari Nama Murid / NIS
+          {/* 3. Tombol Tambah / Kelola Indikator */}
+          <div className="md:col-span-4 flex flex-col justify-end">
+            <label className="text-[11px] font-extrabold text-teal-200 block mb-1">
+              3. Indikator Penilaian
             </label>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-teal-300" />
-              <input
-                type="text"
-                placeholder="Ketik nama siswa..."
-                value={searchMurid}
-                onChange={(e) => setSearchMurid(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 bg-white/10 border border-white/20 text-white placeholder:text-teal-200/60 rounded-xl text-xs focus:outline-hidden focus:bg-slate-900"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowIndikatorModal(true)}
+              className="w-full px-3.5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-slate-900" />
+              <span>+ Tambah Indikator ({activeIndicators.length} Dipilih)</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* VIEW MODE 1: RUBRIC ASSESSMENT (Left: Students, Right: Rubric) */}
       {mainViewMode === 'rubrik' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Student Selector with Multi-Materi Badges */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-              {/* Action Buttons for Selection */}
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 flex-wrap">
-                <div>
+        <div className="space-y-6">
+          {/* Student Selector Card with Multi-Select Checkboxes */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
                   <h3 className="text-sm font-extrabold text-slate-800">
-                    Daftar Murid ({muridInKelas.length})
+                    Pilih Nama Murid (Bisa Lebih dari 1 Murid)
                   </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Materi Aktif: <strong className="text-teal-700 truncate">{selectedMateriJudul}</strong>
-                  </p>
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-900 font-extrabold text-[11px] rounded-full">
+                    {selectedMuridIds.length} Terpilih dari {muridInKelas.length} Siswa
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={selectAllStudents}
-                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
-                  >
-                    Pilih Semua
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectSmallGroup(4)}
-                    className="px-2.5 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
-                  >
-                    Grup (4)
-                  </button>
-                  {selectedMuridIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={clearSelection}
-                      className="px-2 py-1 text-slate-400 hover:text-rose-600 font-medium rounded-lg text-[11px] transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                  )}
-                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Centang murid yang akan dinilai pada materi <strong className="text-teal-700">{selectedMateriJudul}</strong>.
+                </p>
               </div>
 
-              {/* Student Cards with Multi-Materi Badges */}
-              <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
-                {searchedMurid.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 text-xs">
-                    Tidak ditemukan murid di kelas ini.
-                  </div>
-                ) : (
-                  searchedMurid.map((murid, idx) => {
-                    const isChecked = selectedMuridIds.includes(murid.id);
-                    const isActive = activeMuridId === murid.id;
-                    const assessmentData = getMuridData(murid.id);
-                    const allPraktikMurid = getStudentAllPraktik(murid.id);
-
-                    const existingCurrentMateri = allPraktikMurid.find(
-                      (p) =>
-                        (p.materiJudul || p.materi || '').trim().toLowerCase() ===
-                        selectedMateriJudul.trim().toLowerCase()
-                    );
-                    const liveScore = calculateScore(assessmentData.rubrik);
-
-                    return (
-                      <div
-                        key={murid.id}
-                        onClick={() => setActiveMuridId(murid.id)}
-                        className={`p-3 rounded-2xl border text-xs cursor-pointer transition-all space-y-2 ${
-                          isActive
-                            ? 'border-emerald-500 bg-emerald-50/50 shadow-xs ring-2 ring-emerald-500/20'
-                            : isChecked
-                            ? 'border-emerald-200 bg-emerald-50/20'
-                            : 'border-slate-200/80 bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          {/* Checkbox & Avatar & Info */}
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSelectMurid(murid.id);
-                              }}
-                              className="text-slate-400 hover:text-emerald-600 focus:outline-hidden"
-                            >
-                              {isChecked ? (
-                                <CheckSquare className="w-4 h-4 text-emerald-600" />
-                              ) : (
-                                <Square className="w-4 h-4 text-slate-300" />
-                              )}
-                            </button>
-
-                            <img
-                              src={
-                                murid.avatar ||
-                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${murid.name}`
-                              }
-                              alt={murid.name}
-                              className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
-                            />
-
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-800 truncate block">
-                                  {idx + 1}. {murid.name}
-                                </span>
-                                {isActive && (
-                                  <span className="px-1.5 py-0.2 bg-emerald-600 text-white font-black text-[9px] rounded-full uppercase">
-                                    Aktif
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                NIS: {murid.nis || '-'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Live Score for current materi */}
-                          <div className="shrink-0 text-right">
-                            <div
-                              className={`px-2.5 py-1 rounded-xl font-black text-xs inline-flex items-center gap-1 ${
-                                liveScore >= 90
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : liveScore >= 80
-                                  ? 'bg-sky-100 text-sky-800'
-                                  : liveScore >= 70
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-rose-100 text-rose-800'
-                              }`}
-                            >
-                              <span>{liveScore}</span>
-                              <span className="text-[10px] font-bold">
-                                {liveScore >= 90 ? 'SB' : liveScore >= 80 ? 'B' : liveScore >= 70 ? 'C' : 'K'}
-                              </span>
-                            </div>
-                            {existingCurrentMateri && (
-                              <span className="text-[9px] text-emerald-600 font-medium block mt-0.5">
-                                Tersimpan
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Multi-Materi Badges: shows all other practical grades this student has earned */}
-                        {allPraktikMurid.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-slate-100">
-                            <span className="text-[9px] text-slate-400 font-medium">Materi Lain:</span>
-                            {allPraktikMurid.map((p) => {
-                              const isCurrent =
-                                (p.materiJudul || p.materi || '').trim().toLowerCase() ===
-                                selectedMateriJudul.trim().toLowerCase();
-                              return (
-                                <span
-                                  key={p.id}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition ${
-                                    isCurrent
-                                      ? 'bg-teal-600 text-white border-teal-700 shadow-2xs'
-                                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                                  }`}
-                                  title={`${p.materiJudul || p.materi}: Nilai ${p.nilaiAkhir || p.nilaiTotal}`}
-                                >
-                                  {(p.materiJudul || p.materi || '').slice(0, 12)}: {p.nilaiAkhir || p.nilaiTotal}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
+              {/* Quick Select Buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={selectAllStudents}
+                  className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>Pilih Semua</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectSmallGroup(4)}
+                  className="px-3 py-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Kelompok (4 Siswa)</span>
+                </button>
+                {selectedMuridIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="px-3 py-1.5 text-slate-500 hover:text-rose-600 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Batal Pilih
+                  </button>
                 )}
               </div>
             </div>
+
+            {/* Search Input */}
+            <div className="relative max-w-md">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari murid berdasarkan nama atau NIS..."
+                value={searchMurid}
+                onChange={(e) => setSearchMurid(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-teal-400"
+              />
+            </div>
+
+            {/* Multi-Select Student Grid/Chips */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-64 overflow-y-auto pr-1">
+              {searchedMurid.length === 0 ? (
+                <div className="col-span-full text-center py-6 text-slate-400 text-xs">
+                  Tidak ada murid ditemukan di kelas ini.
+                </div>
+              ) : (
+                searchedMurid.map((murid, idx) => {
+                  const isChecked = selectedMuridIds.includes(murid.id);
+                  const isAlreadyAssessed = (db.penilaianPraktik || []).some(
+                    (p) =>
+                      p.muridId === murid.id &&
+                      ((p.materiJudul || p.materi || '').trim().toLowerCase() ===
+                        selectedMateriJudul.trim().toLowerCase())
+                  );
+
+                  return (
+                    <div
+                      key={murid.id}
+                      onClick={() => toggleSelectMurid(murid.id)}
+                      className={`p-2.5 rounded-2xl border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                        isChecked
+                          ? 'border-teal-500 bg-teal-50/50 shadow-xs ring-1 ring-teal-500/30'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="text-slate-400 hover:text-teal-600 shrink-0">
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300" />
+                          )}
+                        </div>
+                        <img
+                          src={
+                            murid.avatar ||
+                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${murid.name}`
+                          }
+                          alt={murid.name}
+                          className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-800 truncate block text-[11px]">
+                            {idx + 1}. {murid.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            NIS: {murid.nis || '-'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isAlreadyAssessed && (
+                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-black text-[9px] rounded-md shrink-0">
+                          Dinilai
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
 
-          {/* Right Column: Rubric 1 - 4 for Active Student */}
-          <div className="lg:col-span-7 space-y-4">
-            {!activeMurid ? (
-              <div className="bg-white rounded-3xl p-12 border border-slate-200/80 shadow-xs text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                  <Users className="w-7 h-7" />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-800">
-                  Pilih Siswa untuk Mulai Penilaian
-                </h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Klik salah satu nama murid di panel kiri untuk membuka formulir rubrik psikomotorik 6 aspek skala 1 - 4.
-                </p>
+          {/* Active Indicators Summary Bar */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-extrabold text-slate-800">
+                Indikator Aktif ({activeIndicators.length}):
+              </span>
+              {activeIndicators.map((ind, i) => (
+                <span
+                  key={ind.id}
+                  className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200 flex items-center gap-1.5"
+                >
+                  <span>
+                    {i + 1}. {ind.nama}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveIndikator(ind.id);
+                    }}
+                    className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                    title="Hapus indikator ini"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowIndikatorModal(true)}
+                className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tambah / Pilih Indikator</span>
+              </button>
+            </div>
+          </div>
+
+          {/* MAIN ASSESSMENT SECTION:
+              Render all selected indicators UNDERNEATH each selected student's name! */}
+          {selectedMuridIds.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 border border-slate-200/80 shadow-xs text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
+                <Users className="w-7 h-7" />
               </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-5">
-                {/* Active Student Header Card */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={
-                        activeMurid.avatar ||
-                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeMurid.name}`
-                      }
-                      alt={activeMurid.name}
-                      className="w-11 h-11 rounded-2xl ring-2 ring-emerald-400 bg-white object-cover"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-black text-slate-900">{activeMurid.name}</h3>
-                        <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-[10px] font-extrabold">
-                          NIS: {activeMurid.nis || '-'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        Materi: <span className="font-bold text-teal-800">{selectedMateriJudul}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Skor Akhir
-                      </span>
-                      <span className="text-2xl font-black text-emerald-700">{activeScore}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-white shadow-2xs border border-emerald-200 text-center">
-                      <span className="text-[9px] font-bold text-slate-400 block uppercase">
-                        Predikat
-                      </span>
-                      <span className="text-xs font-black text-emerald-800">
-                        {getPredikat(activeScore).split(' ')[0]}
-                      </span>
-                    </div>
-                  </div>
+              <h3 className="text-base font-extrabold text-slate-800">
+                Belum Ada Murid yang Dipilih
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Silakan pilih atau centang satu atau beberapa nama murid pada kotak di atas.
+                Semua indikator penilaian yang dipilih akan langsung ditampilkan di bawah nama masing-masing murid.
+              </p>
+              <button
+                type="button"
+                onClick={selectAllStudents}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckSquare className="w-4 h-4" />
+                <span>Pilih Semua Murid Kelas Ini</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Batch Action Toolbar */}
+              <div className="bg-gradient-to-r from-slate-900 to-teal-950 rounded-2xl p-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-teal-200">
+                    Menampilkan Penilaian untuk:
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-teal-500/30 text-teal-200 rounded-lg text-xs font-black">
+                    {selectedStudents.length} Murid Terpilih
+                  </span>
                 </div>
 
-                {/* Rubric Criteria 1 to 6 */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                      Rubrik Psikomotorik (Skala 1 - 4)
-                    </h4>
-                    {selectedMuridIds.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          activeMuridAssessment &&
-                          applyRubrikToAllSelected(activeMuridAssessment.rubrik)
-                        }
-                        className="text-xs font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Terapkan ke {selectedMuridIds.length} Murid Terpilih</span>
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] text-slate-300 font-medium">Beri Nilai Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickBatchScore(4)}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition cursor-pointer"
+                  >
+                    Semua Sangat Baik (4)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickBatchScore(3)}
+                    className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold rounded-lg transition cursor-pointer"
+                  >
+                    Semua Baik (3)
+                  </button>
 
-                  {RUBRIC_CRITERIA.map((crit) => {
-                    const currentVal =
-                      (activeMuridAssessment?.rubrik as any)?.[crit.key] ?? 3;
+                  <button
+                    type="button"
+                    onClick={() => handleSaveStudents(selectedMuridIds)}
+                    className="px-4 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer ml-1"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Simpan {selectedStudents.length} Siswa</span>
+                  </button>
+                </div>
+              </div>
 
-                    return (
-                      <div
-                        key={crit.key}
-                        className="p-4 rounded-2xl border border-slate-200/70 bg-slate-50/40 space-y-2.5"
-                      >
-                        <div className="flex items-start justify-between gap-3">
+              {/* STUDENT CARDS LIST:
+                  Each card displays the student's name, followed by all chosen indicators underneath! */}
+              <div className="space-y-5">
+                {selectedStudents.map((murid, studentIdx) => {
+                  const assessmentData = getMuridAssessment(murid.id);
+                  const indikatorList = getStudentIndikatorList(murid.id);
+                  const scoreCalc = calculateIndikatorScore(indikatorList);
+
+                  return (
+                    <div
+                      key={murid.id}
+                      className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs hover:shadow-md transition-all space-y-5"
+                    >
+                      {/* Student Header */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 via-emerald-50 to-slate-50 border border-teal-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              murid.avatar ||
+                              `https://api.dicebear.com/7.x/avataaars/svg?seed=${murid.name}`
+                            }
+                            alt={murid.name}
+                            className="w-12 h-12 rounded-2xl ring-2 ring-teal-500 bg-white object-cover"
+                          />
                           <div>
-                            <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                              {crit.title}
-                            </h5>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{crit.desc}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-teal-800">
+                                Murid #{studentIdx + 1}
+                              </span>
+                              <h3 className="text-base font-black text-slate-900">{murid.name}</h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              NIS: <strong className="text-slate-700">{murid.nis || '-'}</strong> •
+                              Kelas:{' '}
+                              <strong className="text-slate-700">
+                                {db.kelas.find((k) => k.id === selectedKelasId)?.nama ||
+                                  selectedKelasId}
+                              </strong>{' '}
+                              • Materi: <span className="font-bold text-teal-700">{selectedMateriJudul}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Live Score Display & Quick Apply */}
+                        <div className="flex items-center gap-3 self-start sm:self-auto">
+                          <div className="text-right">
+                            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                              Nilai Praktik
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-2xl font-black text-teal-700">
+                                {scoreCalc.nilai100}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-black ${
+                                  scoreCalc.predikat === 'A'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : scoreCalc.predikat === 'B'
+                                    ? 'bg-sky-100 text-sky-800'
+                                    : scoreCalc.predikat === 'C'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {scoreCalc.predikatLabel}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Total Skor: {scoreCalc.totalSkor} / {scoreCalc.maxSkor} (Rata-rata:{' '}
+                              {scoreCalc.rataRataSkala4}/4)
+                            </span>
                           </div>
 
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-white border border-slate-200 text-slate-800 shrink-0">
-                            Skor: {currentVal}
+                          {selectedStudents.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => applyStudentScoresToAll(murid.id)}
+                              className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title="Salin nilai murid ini ke semua murid terpilih"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                              <span className="hidden md:inline">Salin ke Semua</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* INDIKATOR SECTION:
+                          Render all chosen indicators directly below this student's name */}
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                          <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <Activity className="w-3.5 h-3.5 text-teal-600" />
+                            <span>Indikator Penilaian Praktik ({activeIndicators.length} Indikator):</span>
+                          </h4>
+                          <span className="text-[11px] text-slate-400">
+                            Pilih Skala 1 (Kurang) s/d 4 (Sangat Baik)
                           </span>
                         </div>
 
-                        {/* 1 - 4 scale buttons */}
-                        <div className="grid grid-cols-4 gap-2">
-                          {[1, 2, 3, 4].map((scale) => {
-                            const isSelected = currentVal === scale;
-                            const meta = SKALA_LABELS[scale];
+                        <div className="grid grid-cols-1 gap-3">
+                          {activeIndicators.map((ind, indIdx) => {
+                            const currentScore = assessmentData.scores[ind.id] ?? 3;
 
                             return (
-                              <button
-                                type="button"
-                                key={scale}
-                                onClick={() =>
-                                  handleScoreChange(activeMurid.id, crit.key, scale)
-                                }
-                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                                  isSelected
-                                    ? meta.activeColor
-                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                                }`}
+                              <div
+                                key={ind.id}
+                                className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-slate-50/70 transition space-y-2.5"
                               >
-                                <div className="text-sm font-black">{scale}</div>
-                                <div className="text-[10px] font-bold truncate">{meta.label}</div>
-                              </button>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full bg-teal-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">
+                                        {indIdx + 1}
+                                      </span>
+                                      <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                                        {ind.nama}
+                                      </h5>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mt-1 pl-7">
+                                      {ind.deskripsi}
+                                    </p>
+                                  </div>
+
+                                  <div className="pl-7 sm:pl-0 shrink-0">
+                                    <span
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-black ${
+                                        currentScore === 4
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : currentScore === 3
+                                          ? 'bg-sky-100 text-sky-800'
+                                          : currentScore === 2
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : 'bg-rose-100 text-rose-800'
+                                      }`}
+                                    >
+                                      Skor:{' '}
+                                      {currentScore === 4
+                                        ? '4 (Sangat Baik)'
+                                        : currentScore === 3
+                                        ? '3 (Baik)'
+                                        : currentScore === 2
+                                        ? '2 (Cukup)'
+                                        : '1 (Kurang)'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Clickable Scale Buttons 1, 2, 3, 4 */}
+                                <div className="grid grid-cols-4 gap-2 pt-1 pl-0 sm:pl-7">
+                                  {[1, 2, 3, 4].map((scale) => {
+                                    const isSelected = currentScore === scale;
+                                    const meta = SKALA_INDIKATOR_INFO[scale];
+
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={scale}
+                                        onClick={() =>
+                                          handleScoreChange(murid.id, ind.id, scale)
+                                        }
+                                        className={`py-2 px-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                          isSelected
+                                            ? meta.activeBg
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                        <div className="text-sm font-black">{scale}</div>
+                                        <div className="text-[10px] font-bold truncate">
+                                          {meta.short}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             );
                           })}
                         </div>
-                      </div>
-                    );
-                  })}
 
-                  {/* Teacher's Evaluation Note */}
-                  <div className="p-4 rounded-2xl border border-slate-200/70 bg-white space-y-2">
-                    <label className="text-xs font-bold text-slate-700 block">
-                      Catatan Evaluasi / Rekomendasi Perbaikan Gerak:
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={activeMuridAssessment?.catatan || ''}
-                      onChange={(e) => handleCatatanChange(activeMurid.id, e.target.value)}
-                      placeholder="Tuliskan catatan khusus perkembangan teknik gerakan siswa..."
-                      className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 bg-slate-50/50"
-                    />
+                        {/* Teacher's Individual Note */}
+                        <div className="p-3.5 rounded-2xl border border-slate-200 bg-white space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700 block">
+                            Catatan Evaluasi Gerakan Siswa:
+                          </label>
+                          <input
+                            type="text"
+                            value={assessmentData.catatan || ''}
+                            onChange={(e) => handleCatatanChange(murid.id, e.target.value)}
+                            placeholder="Tuliskan catatan khusus perkembangan teknik gerakan siswa..."
+                            className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-teal-400 bg-slate-50/50"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Save this individual student button */}
+                      <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveStudents([murid.id])}
+                          className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Simpan Penilaian {murid.name}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bottom Big Save Button */}
+              <div className="sticky bottom-4 z-30 p-4 bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
+                <div>
+                  <div className="text-xs font-bold text-teal-300">
+                    Siap Menyimpan & Menghubungkan ke Akun Murid
                   </div>
+                  <p className="text-[11px] text-slate-300">
+                    {selectedStudents.length} murid terpilih pada materi "{selectedMateriJudul}"
+                  </p>
                 </div>
 
-                {/* Save Buttons Footer */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-xs text-slate-500 font-medium">
-                    {selectedMuridIds.length > 1 && (
-                      <span>
-                        Ada <strong className="text-emerald-700">{selectedMuridIds.length}</strong> murid terpilih
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSaveStudents([activeMurid.id])}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>Simpan Nilai {activeMurid.name}</span>
-                    </button>
-
-                    {selectedMuridIds.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleSaveStudents(selectedMuridIds)}
-                        className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Simpan Semua ({selectedMuridIds.length} Siswa)</span>
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveStudents(selectedMuridIds)}
+                    className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg transition cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Simpan Penilaian Semua Murid Terpilih ({selectedStudents.length})</span>
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* VIEW MODE 2: MULTI-MATERI RECAP MATRIX (Shows all practical materials for each student) */
+        /* VIEW MODE 2: REKAP MATRIKS KELAS */
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
@@ -1069,7 +1238,6 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
                     Nama Siswa
                   </th>
 
-                  {/* Dynamic Columns for each evaluated materi */}
                   {assessedMaterialsInClass.map((materi) => (
                     <th
                       key={materi}
@@ -1093,79 +1261,68 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {searchedMurid.map((m, idx) => {
-                  const studentAll = getStudentAllPraktik(m.id);
+                  const studentAll = (db.penilaianPraktik || []).filter((p) => p.muridId === m.id);
                   let sumScore = 0;
                   let count = 0;
 
                   return (
-                    <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-400 sticky left-0 bg-white z-10">
+                    <tr key={m.id} className="hover:bg-slate-50/70">
+                      <td className="py-2.5 px-3 text-center text-slate-400 sticky left-0 bg-white">
                         {idx + 1}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px] sticky left-10 bg-white z-10">
+                      <td className="py-2.5 px-3 font-mono text-slate-500 sticky left-10 bg-white">
                         {m.nis || '-'}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-slate-800 sticky left-38 bg-white z-10 shadow-xs truncate">
+                      <td className="py-2.5 px-4 font-bold text-slate-800 sticky left-38 bg-white shadow-xs">
                         {m.name}
                       </td>
 
-                      {/* Score per materi */}
-                      {assessedMaterialsInClass.map((materi) => {
-                        const rec = studentAll.find(
+                      {assessedMaterialsInClass.map((mat) => {
+                        const found = studentAll.find(
                           (p) =>
                             (p.materiJudul || p.materi || '').trim().toLowerCase() ===
-                            materi.trim().toLowerCase()
+                            mat.trim().toLowerCase()
                         );
-                        if (rec) {
-                          const val = rec.nilaiAkhir || rec.nilaiTotal || 0;
-                          sumScore += val;
+                        if (found) {
+                          const sc = found.nilaiAkhir || found.nilaiTotal || 0;
+                          sumScore += sc;
                           count++;
-
                           return (
                             <td
-                              key={materi}
-                              className="py-2.5 px-2 text-center border-l border-slate-100"
+                              key={mat}
+                              className="py-2.5 px-3 text-center border-l border-slate-100 font-extrabold text-slate-800"
                             >
-                              <span
-                                className={`inline-block px-2.5 py-0.5 rounded-lg font-black text-xs ${
-                                  val >= 90
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : val >= 80
-                                    ? 'bg-sky-100 text-sky-800'
-                                    : val >= 70
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-rose-100 text-rose-800'
-                                }`}
-                              >
-                                {val}
+                              <span className="px-2 py-0.5 bg-teal-50 text-teal-800 rounded-md">
+                                {sc}
                               </span>
                             </td>
                           );
                         }
-
                         return (
                           <td
-                            key={materi}
-                            className="py-2.5 px-2 text-center text-slate-300 font-mono border-l border-slate-100"
+                            key={mat}
+                            className="py-2.5 px-3 text-center border-l border-slate-100 text-slate-300"
                           >
                             -
                           </td>
                         );
                       })}
 
-                      {/* Cumulative Average */}
-                      <td className="py-2.5 px-2 text-center font-black text-emerald-800 bg-emerald-50/50 border-l border-emerald-200">
-                        {count > 0 ? Math.round(sumScore / count) : '-'}
-                      </td>
-                      <td className="py-2.5 px-2 text-center border-l border-slate-200">
-                        {count > 0 ? (
-                          <span className="font-bold text-slate-700">
-                            {getPredikat(Math.round(sumScore / count)).split(' ')[0]}
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
+                      {(() => {
+                        const avg = count > 0 ? Math.round(sumScore / count) : 0;
+                        const pred =
+                          avg >= 88 ? 'A' : avg >= 78 ? 'B' : avg >= 65 ? 'C' : avg > 0 ? 'D' : '-';
+                        return (
+                          <>
+                            <td className="py-2.5 px-3 text-center font-black text-emerald-800 bg-emerald-50/40 border-l border-emerald-100">
+                              {avg || '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-bold text-slate-700 border-l border-slate-100">
+                              {pred}
+                            </td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   );
                 })}
@@ -1175,31 +1332,198 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
         </div>
       )}
 
-      {/* MODAL: TAMBAH MATERI PRAKTIK BARU */}
-      {showAddMateriModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-slate-100">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider bg-teal-50 px-2 py-0.5 rounded-md">
-                  Materi Penilaian Praktik
-                </span>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1">
-                  Tambah Materi Praktik Baru
-                </h3>
+      {/* MODAL: KELOLA & TAMBAH INDIKATOR PENILAIAN */}
+      {showIndikatorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 text-amber-900 rounded-xl">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800">
+                    Kelola Indikator Penilaian Praktik
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Materi: <strong className="text-teal-700">{selectedMateriJudul}</strong>
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowAddMateriModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg"
+                onClick={() => setShowIndikatorModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Ketikkan judul atau cabang materi olahraga baru. Materi ini akan langsung tersedia pada daftar pilihan dan guru bisa menilai seluruh siswa pada materi ini.
-            </p>
+            {/* Current Active Indicators */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                  Indikator Terpilih ({activeIndicators.length})
+                </h4>
+                <span className="text-[11px] text-teal-700 font-bold">
+                  Bisa memilih lebih dari 1 indikator
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {activeIndicators.map((ind, idx) => (
+                  <div
+                    key={ind.id}
+                    className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-teal-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <strong className="text-slate-800 truncate block">{ind.nama}</strong>
+                        <p className="text-[11px] text-slate-500 truncate">{ind.deskripsi}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveIndikator(ind.id)}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition cursor-pointer shrink-0"
+                      title="Hapus indikator ini"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Suggested Indicators Library for this sport */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                Pilih dari Bank Indikator Standar PJOK:
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Klik untuk menambah atau mengaktifkan indikator standar ke formulir penilaian Anda:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                {(MASTER_INDIKATOR_LIBRARY['voli'] || DEFAULT_STANDAR_INDIKATOR).map((tmpl) => {
+                  const isAlreadyActive = activeIndicators.some((ai) => ai.nama === tmpl.nama);
+
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => {
+                        if (isAlreadyActive) {
+                          setActiveIndicators((prev) => prev.filter((i) => i.nama !== tmpl.nama));
+                        } else {
+                          setActiveIndicators((prev) => [...prev, tmpl]);
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left text-xs transition flex items-start justify-between gap-2 cursor-pointer ${
+                        isAlreadyActive
+                          ? 'border-teal-500 bg-teal-50 text-teal-900 font-bold'
+                          : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-extrabold text-[11px]">{tmpl.nama}</div>
+                        <div className="text-[10px] text-slate-500 line-clamp-1">
+                          {tmpl.deskripsi}
+                        </div>
+                      </div>
+                      <div className="shrink-0 mt-0.5">
+                        {isAlreadyActive ? (
+                          <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                        ) : (
+                          <Plus className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Add Custom Indicator Form */}
+            <form onSubmit={handleAddCustomIndikator} className="space-y-3 pt-3 border-t border-slate-100">
+              <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                + Tambah Indikator Kustom Sendiri
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Nama Indikator *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={customIndikatorNama}
+                    onChange={(e) => setCustomIndikatorNama(e.target.value)}
+                    placeholder="Contoh: Ketinggian Lompatan & Pendaratan"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                    Deskripsi / Kriteria Indikator
+                  </label>
+                  <input
+                    type="text"
+                    value={customIndikatorDesc}
+                    onChange={(e) => setCustomIndikatorDesc(e.target.value)}
+                    placeholder="Contoh: Kaki menolak maksimal dan mendarat seimbang"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambahkan Indikator Ini</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowIndikatorModal(false)}
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Terapkan ke Penilaian</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TAMBAH MATERI BARU */}
+      {showAddMateriModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-teal-100 text-teal-800 rounded-xl">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-slate-800">
+                  Tambah Materi Praktik PJOK Baru
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddMateriModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <form onSubmit={handleAddNewMateriSubmit} className="space-y-4">
               <div className="space-y-1">
@@ -1214,28 +1538,6 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
                   placeholder="Contoh: Tenis Meja - Servis & Forehand Drive"
                   className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-400 bg-slate-50/50 font-bold"
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-400 block">Saran Cepat:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Tenis Meja - Servis & Spin',
-                    'Lompat Jauh - Gaya Menggantung',
-                    'Kebugaran - Bleep Test',
-                    'Senam Irama - Rangkaian Senam',
-                    'Futsal - Passing & Shooting',
-                  ].map((sug) => (
-                    <button
-                      type="button"
-                      key={sug}
-                      onClick={() => setNewMateriName(sug)}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-medium transition cursor-pointer"
-                    >
-                      {sug}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-2">

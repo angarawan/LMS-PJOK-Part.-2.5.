@@ -55,16 +55,58 @@ export const MuridDashboard: React.FC<MuridDashboardProps> = ({ db, currentUser,
   );
   const refleksiBelumIsi = myRefleksiList.filter((r) => !myAnsweredRefleksiIds.has(r.id));
 
+  // Student practical assessments
+  const myPraktikAssessments = (db.penilaianPraktik || []).filter((p) => {
+    if (p.muridId === currentUser.id) return true;
+    if (currentUser.nis && (p.muridId === currentUser.nis || p.nis === currentUser.nis)) return true;
+    if (
+      p.muridNama &&
+      currentUser.name &&
+      p.muridNama.trim().toLowerCase() === currentUser.name.trim().toLowerCase()
+    )
+      return true;
+    return false;
+  });
+
+  const avgPraktik =
+    myPraktikAssessments.length > 0
+      ? Math.round(
+          myPraktikAssessments.reduce(
+            (acc, p) => acc + (p.nilaiAkhir || p.nilaiTotal || 80),
+            0
+          ) / myPraktikAssessments.length
+        )
+      : 88;
+
   // Student grades
-  const nilaiSaya = (db.nilai || []).find((n) => n.muridId === currentUser.id) || {
-    tugas: 85,
-    quiz: 80,
-    praktik: 88,
-    pengetahuan: 83,
-    keterampilan: 88,
-    sikap: 90,
-    nilaiAkhir: 86,
-    predikat: 'B',
+  const foundNilai = (db.nilai || []).find(
+    (n) =>
+      n.muridId === currentUser.id ||
+      (currentUser.nis && (n.muridId === currentUser.nis || n.nis === currentUser.nis)) ||
+      (n.muridNama &&
+        currentUser.name &&
+        n.muridNama.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+  );
+
+  const tugas = foundNilai?.tugas ?? 85;
+  const quiz = foundNilai?.quiz ?? 80;
+  const praktik = myPraktikAssessments.length > 0 ? avgPraktik : (foundNilai?.praktik ?? 88);
+  const pengetahuan = foundNilai?.pengetahuan ?? Math.round((tugas + quiz) / 2);
+  const keterampilan = praktik;
+  const sikap = foundNilai?.sikap ?? 90;
+  const nilaiAkhir = Math.round(pengetahuan * 0.3 + keterampilan * 0.5 + sikap * 0.2);
+  const predikat =
+    nilaiAkhir >= 88 ? 'A' : nilaiAkhir >= 78 ? 'B' : nilaiAkhir >= 65 ? 'C' : 'D';
+
+  const nilaiSaya = {
+    tugas,
+    quiz,
+    praktik,
+    pengetahuan,
+    keterampilan,
+    sikap,
+    nilaiAkhir,
+    predikat,
   };
 
   // Student attendance
