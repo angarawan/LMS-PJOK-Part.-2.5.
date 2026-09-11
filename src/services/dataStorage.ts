@@ -731,9 +731,24 @@ class DataStorageService {
   /**
    * Menginisialisasi pendengar real-time Firestore agar perubahan di satu perangkat
    * (misal laptop guru) langsung otomatis diterima di perangkat lain (misal HP siswa)
+   * serta mendukung mode Standby / Offline tanpa gangguan.
    */
   private async initFirestoreSync() {
     try {
+      // Pasang deteksi status jaringan browser
+      if (typeof window !== 'undefined') {
+        window.addEventListener('online', () => {
+          console.info('Koneksi internet terdeteksi online. Memulai sinkronisasi otomatis Cloud Firestore...');
+          this.updateSyncStatus('syncing');
+          this.forceRefreshFromFirestore().catch(() => {});
+        });
+
+        window.addEventListener('offline', () => {
+          console.warn('Mode Standby / Offline aktif. Data tersimpan aman di IndexedDB & LocalStorage.');
+          this.updateSyncStatus('offline');
+        });
+      }
+
       // Pastikan ada sesi autentikasi Firebase di background
       if (!auth.currentUser) {
         signInAnonymously(auth).catch((err) => {
@@ -741,14 +756,17 @@ class DataStorageService {
         });
       }
 
-      this.updateSyncStatus('connecting');
+      this.updateSyncStatus(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'connecting');
       const recordsCol = collection(firestore, 'lms_records');
 
-      // Pasang listener real-time onSnapshot
+      // Pasang listener real-time onSnapshot dengan includeMetadataChanges untuk mendeteksi cache & server state
       this.unsubscribeFirestore = onSnapshot(
         recordsCol,
+        { includeMetadataChanges: true },
         (snapshot) => {
           this.lastSyncTime = new Date();
+          const isFromCache = snapshot.metadata.fromCache;
+          const hasPendingWrites = snapshot.metadata.hasPendingWrites;
 
           if (snapshot.empty) {
             console.log('Firestore masih kosong, mengunggah data inisial sistem ke Firestore...');
@@ -758,7 +776,7 @@ class DataStorageService {
 
           // Jangan timpa jika sedang dalam proses upload lokal kita sendiri
           if (this.isSyncingToFirestore) {
-            this.updateSyncStatus('synced');
+            this.updateSyncStatus(isFromCache && typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'synced');
             return;
           }
 
@@ -791,10 +809,16 @@ class DataStorageService {
               this.notifyLocalListeners();
             }
 
-            this.updateSyncStatus('synced');
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+              this.updateSyncStatus('offline');
+            } else if (hasPendingWrites) {
+              this.updateSyncStatus('syncing');
+            } else {
+              this.updateSyncStatus('synced');
+            }
           } catch (err) {
             console.error('Gagal menerapkan update real-time dari Firestore:', err);
-            this.updateSyncStatus('error');
+            this.updateSyncStatus(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'error');
           } finally {
             this.isApplyingRemoteUpdate = false;
           }

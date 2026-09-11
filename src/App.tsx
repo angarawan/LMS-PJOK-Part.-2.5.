@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dataStorage, LMSDatabase } from './services/dataStorage';
+import { dataStorage, LMSDatabase, FirestoreSyncStatus } from './services/dataStorage';
 import { User, UserRole } from './types';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -60,13 +60,20 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<FirestoreSyncStatus>(dataStorage.getSyncStatus());
 
-  // Subscribe to local storage changes
+  // Subscribe to local storage changes and Firestore sync status
   useEffect(() => {
-    const unsubscribe = dataStorage.subscribe((newDb) => {
+    const unsubscribeDb = dataStorage.subscribe((newDb) => {
       setDb(newDb);
     });
-    return () => unsubscribe();
+    const unsubscribeSync = dataStorage.onSyncStatusChange((status) => {
+      setSyncStatus(status);
+    });
+    return () => {
+      unsubscribeDb();
+      unsubscribeSync();
+    };
   }, []);
 
   // Update current user if updated in db
@@ -291,6 +298,24 @@ export default function App() {
           }}
           settings={db.settings}
         />
+
+        {/* Standby / Offline Mode Active Banner */}
+        {syncStatus === 'offline' && (
+          <div className="bg-amber-500/10 border-b border-amber-300/80 px-4 py-2 flex items-center justify-between text-xs text-amber-950 shrink-0 z-20">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span>
+                <strong className="font-bold">Mode Standby / Offline Aktif:</strong> Perangkat tidak terhubung ke internet. Anda tetap dapat menginput nilai praktik, presensi, membaca materi, dan mengerjakan kuis. Seluruh data tersimpan aman di memori perangkat ini dan akan otomatis disinkronkan ke Cloud Firestore segera saat online.
+              </span>
+            </div>
+            <button
+              onClick={() => dataStorage.forceRefreshFromFirestore()}
+              className="ml-3 shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-2xs"
+            >
+              Cek Koneksi
+            </button>
+          </div>
+        )}
 
         {/* Workspace Main View */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">

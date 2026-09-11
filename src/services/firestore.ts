@@ -1,19 +1,43 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  getFirestore,
+  Firestore,
+  doc,
+  getDocFromServer,
+  enableNetwork,
+  disableNetwork,
+} from 'firebase/firestore';
 import { auth } from './firebaseAuth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const firestore: Firestore = (() => {
+  const dbId = firebaseConfig.firestoreDatabaseId || undefined;
   try {
-    if (firebaseConfig.firestoreDatabaseId) {
-      return getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    }
-    return getFirestore(app);
+    // Initialize Firestore with persistent multi-tab local cache for standby/offline support
+    return initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      },
+      dbId
+    );
   } catch (err) {
-    console.warn('Failed to initialize Firestore with custom databaseId, falling back to default:', err);
-    return getFirestore(app);
+    console.info('Using standard Firestore instance (fallback):', err);
+    try {
+      if (dbId) {
+        return getFirestore(app, dbId);
+      }
+      return getFirestore(app);
+    } catch {
+      return getFirestore(app);
+    }
   }
 })();
 
@@ -43,7 +67,11 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): never {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -75,5 +103,18 @@ export async function testFirestoreConnection(): Promise<boolean> {
       console.warn('Firestore client is offline or connecting...');
     }
     return false;
+  }
+}
+
+// Network management helpers for offline / standby testing
+export async function toggleFirestoreOffline(goOffline: boolean): Promise<void> {
+  try {
+    if (goOffline) {
+      await disableNetwork(firestore);
+    } else {
+      await enableNetwork(firestore);
+    }
+  } catch (e) {
+    console.warn('Network toggle notice:', e);
   }
 }

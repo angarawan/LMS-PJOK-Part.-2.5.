@@ -318,8 +318,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setShowSyncDetails(!showSyncDetails)}
             id="btn-firestore-sync-status"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium transition-all shadow-2xs hover:bg-gray-50 focus:outline-hidden"
-            title="Sinkronisasi Cloud Firestore Real-time"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all shadow-2xs focus:outline-hidden ${
+              syncStatus === 'synced'
+                ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800'
+                : syncStatus === 'syncing' || isManualSyncing
+                ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50 text-blue-800'
+                : syncStatus === 'connecting'
+                ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800'
+                : 'border-amber-300 bg-amber-50 hover:bg-amber-100/80 text-amber-900'
+            }`}
+            title="Cloud Firestore Real-Time & Otomatis Sinkron Semua Perangkat (Standby / Offline)"
           >
             {syncStatus === 'synced' ? (
               <>
@@ -328,75 +336,99 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="hidden sm:inline text-slate-700 font-semibold text-[11px]">Real-time</span>
+                <span className="hidden sm:inline font-bold text-[11px]">Firestore Real-Time</span>
               </>
             ) : syncStatus === 'syncing' || isManualSyncing ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-                <span className="hidden sm:inline text-blue-700 font-medium text-[11px]">Sinkronisasi...</span>
+                <span className="hidden sm:inline font-semibold text-[11px]">Sinkronisasi...</span>
               </>
             ) : syncStatus === 'connecting' ? (
               <>
-                <RefreshCw className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-                <span className="hidden sm:inline text-amber-700 font-medium text-[11px]">Menghubungkan...</span>
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <span className="hidden sm:inline font-semibold text-[11px]">Menghubungkan...</span>
               </>
             ) : (
               <>
-                <CloudOff className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline text-slate-500 text-[11px]">Offline</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden sm:inline font-bold text-[11px]">Standby / Offline</span>
               </>
             )}
           </button>
 
           {/* Sync Details Popover */}
           {showSyncDetails && (
-            <div className="absolute right-0 mt-2 w-76 sm:w-84 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3.5 text-xs text-slate-700">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                    <Cloud className="w-4 h-4" />
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-4 text-xs text-slate-700">
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                    syncStatus === 'synced' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {syncStatus === 'synced' ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-800 text-xs">Cloud Firestore Real-Time</h4>
+                    <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm">Cloud Firestore Real-Time</h4>
                     <p className="text-[10px] text-slate-500">Otomatis Sinkron Semua Perangkat</p>
                   </div>
                 </div>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase ${
                     syncStatus === 'synced'
-                      ? 'bg-emerald-100 text-emerald-700'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       : syncStatus === 'syncing'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-amber-100 text-amber-700'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : syncStatus === 'connecting'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                      : 'bg-amber-100 text-amber-900 border border-amber-300'
                   }`}
                 >
-                  {syncStatus === 'synced' ? 'Terhubung' : syncStatus === 'syncing' ? 'Menyinkron' : 'Standby'}
+                  {syncStatus === 'synced'
+                    ? '🟢 Real-Time'
+                    : syncStatus === 'syncing'
+                    ? '🔄 Menyinkron'
+                    : syncStatus === 'connecting'
+                    ? '🟡 Menghubungkan'
+                    : '🟠 Standby/Offline'}
                 </span>
               </div>
 
-              <div className="space-y-2 py-1">
-                <div className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-xl text-[11px] leading-relaxed text-slate-600">
-                  <div className="flex items-center gap-1 text-slate-700 font-semibold shrink-0 mt-0.5">
-                    <Laptop className="w-3.5 h-3.5 text-blue-600" />
-                    <span>↔</span>
-                    <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+              <div className="space-y-2.5 py-1">
+                <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-[11px] leading-relaxed text-slate-600 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-slate-800 font-bold">
+                    <Laptop className="w-4 h-4 text-blue-600" />
+                    <span className="text-slate-400">↔</span>
+                    <Smartphone className="w-4 h-4 text-purple-600" />
+                    <span>Sinkronisasi Otomatis Antar Perangkat</span>
                   </div>
-                  <span>
-                    Data materi, nilai, presensi, dan tugas otomatis tersinkronisasi langsung antara laptop guru dan HP murid tanpa perlu spreadsheet.
-                  </span>
+                  <p className="text-slate-600">
+                    Setiap perubahan data (nilai praktik, absensi lapangan, materi, pengumpulan tugas, kuis) langsung terhubung secara live antara laptop guru dan HP siswa secara instan.
+                  </p>
                 </div>
 
-                <div className="flex justify-between items-center text-[11px] text-slate-500 px-1">
+                <div className="bg-amber-50/70 border border-amber-200 p-2.5 rounded-xl text-[11px] leading-relaxed text-amber-900">
+                  <div className="font-bold flex items-center gap-1.5 mb-0.5 text-amber-900">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Dukungan Standby / Offline Penuh</span>
+                  </div>
+                  <p className="text-amber-800/90 text-[10px]">
+                    Jika tidak ada sinyal di lapangan, aplikasi tetap berfungsi normal. Data tersimpan di memori perangkat (IndexedDB & LocalStorage) dan akan otomatis terkirim ke Cloud Firestore saat perangkat online kembali.
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center text-[11px] text-slate-500 px-1 pt-1">
                   <span>Terakhir Sinkron:</span>
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-bold text-slate-800">
                     {lastSyncTime
-                      ? lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                      ? lastSyncTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                       : 'Baru saja'}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-2.5 mt-2 border-t border-gray-100 flex gap-2">
+              <div className="pt-3 mt-2 border-t border-gray-100 flex gap-2">
                 <button
                   onClick={async () => {
                     setIsManualSyncing(true);
@@ -407,10 +439,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }
                   }}
                   disabled={isManualSyncing}
-                  className="flex-1 py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 text-[11px]"
+                  className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 text-[11px] shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin' : ''}`} />
-                  <span>Tarik Data Terbaru</span>
+                  <span>Sinkronkan Sekarang</span>
                 </button>
                 <button
                   onClick={async () => {
@@ -422,10 +454,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }
                   }}
                   disabled={isManualSyncing}
-                  className="py-1.5 px-2.5 bg-gray-100 hover:bg-gray-200 text-slate-700 rounded-lg font-semibold text-[11px] transition-colors"
-                  title="Kirim semua data lokal ke Cloud Firestore"
+                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-[11px] transition-colors border border-slate-200"
+                  title="Kirim semua data lokal saat ini ke Cloud Firestore"
                 >
-                  Unggah Lokal
+                  Unggah ke Cloud
                 </button>
               </div>
             </div>
