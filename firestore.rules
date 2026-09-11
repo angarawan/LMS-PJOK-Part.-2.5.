@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default catch-all rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Real-time synchronization for LMS PJOK records across laptops and smartphones
+    match /lms_records/{section} {
+      allow read, write: if true;
+    }
+  }
+}
