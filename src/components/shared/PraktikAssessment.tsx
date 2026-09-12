@@ -26,6 +26,8 @@ import {
   Trash2,
   SlidersHorizontal,
   Edit3,
+  ArrowUpFromLine,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { PenilaianPraktik, RubrikPraktik, User, IndikatorPraktik } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
@@ -82,6 +84,43 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
   const [customIndikatorNama, setCustomIndikatorNama] = useState<string>('');
   const [customIndikatorDesc, setCustomIndikatorDesc] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState<boolean>(false);
+
+  const handlePushNilaiToSheets = async () => {
+    setSyncLoading(true);
+    setToastMessage(null);
+    try {
+      const res = await dataStorage.syncNilaiToLinkedSpreadsheet();
+      if (res.success) {
+        setToastMessage('Seluruh rekap nilai praktik berhasil dikirim dan tersimpan di Google Spreadsheet (Sheet NILAI)!');
+      } else {
+        setToastMessage(res.message || 'Gagal mengirim nilai ke Spreadsheet. Pastikan URL Webhook telah diisi di menu Integrasi Google Sheets.');
+      }
+    } catch (e: any) {
+      setToastMessage('Gagal menyinkronkan nilai ke Spreadsheet: ' + (e?.message || ''));
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+  };
+
+  const handlePullNilaiFromSheets = async () => {
+    setSyncLoading(true);
+    setToastMessage(null);
+    try {
+      const res = await dataStorage.pullFromLinkedSpreadsheet();
+      if (res.success) {
+        setToastMessage(`Berhasil menarik data nilai dan materi dari Google Spreadsheet! (${res.nilaiCount ?? 0} nilai & ${res.materiCount ?? 0} materi diperbarui)`);
+      } else {
+        setToastMessage(res.message || 'Gagal menarik nilai dari Spreadsheet.');
+      }
+    } catch (e: any) {
+      setToastMessage('Gagal menarik nilai dari Spreadsheet: ' + (e?.message || ''));
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+  };
 
   // Local state for scores keyed by `${materiJudul}_${muridId}`
   // Contains score per indicatorId and notes
@@ -520,7 +559,9 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
     });
 
     setToastMessage(
-      `Berhasil menyimpan penilaian untuk ${newAssessments.length} murid! Nilai telah langsung terhubung ke Akun Murid.`
+      db.settings?.spreadsheetWebhookUrl
+        ? `Berhasil menyimpan penilaian ${newAssessments.length} murid! Nilai otomatis tersinkronisasi ke Google Spreadsheet & Akun Murid.`
+        : `Berhasil menyimpan penilaian untuk ${newAssessments.length} murid! Nilai telah langsung terhubung ke Akun Murid.`
     );
     setTimeout(() => setToastMessage(null), 4000);
   };
@@ -630,8 +671,31 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
             </p>
           </div>
 
-          {/* View Mode Switch */}
-          <div className="flex items-center gap-2 self-start md:self-auto">
+          {/* View Mode Switch & Sheets Sync */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {/* Quick Sheets Sync Buttons */}
+            <button
+              type="button"
+              onClick={handlePullNilaiFromSheets}
+              disabled={syncLoading}
+              title="Tarik nilai praktik terbaru dari Google Spreadsheet"
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <ArrowDownToLine className={`w-3.5 h-3.5 text-sky-300 ${syncLoading ? 'animate-bounce' : ''}`} />
+              <span>Tarik dari Sheets</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePushNilaiToSheets}
+              disabled={syncLoading}
+              title="Kirim seluruh nilai praktik ke lembar kerja NILAI di Google Spreadsheet"
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <ArrowUpFromLine className={`w-3.5 h-3.5 text-emerald-300 ${syncLoading ? 'animate-bounce' : ''}`} />
+              <span>Kirim ke Sheets</span>
+            </button>
+
             <div className="bg-white/10 p-1 rounded-xl flex items-center gap-1 border border-white/15">
               <button
                 type="button"

@@ -1,5 +1,5 @@
 import { getGoogleAccessToken } from './firebaseAuth';
-import { User, UserRole } from '../types';
+import { User, UserRole, Materi, PenilaianPraktik } from '../types';
 
 export interface SheetMetadata {
   spreadsheetId: string;
@@ -684,6 +684,195 @@ export const fetchFromPublicSheetCSV = async (csvUrl: string): Promise<string> =
 };
 
 /**
+ * Parse CSV text to partial Materi objects
+ */
+export const parseCSVToMateri = (csvText: string): Partial<Materi>[] => {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) return [];
+
+  const rawHeaders = rows[0].map((h) => h.toLowerCase().trim().replace(/[^a-z0-9_]/g, ''));
+  const headerMap: Record<string, number> = {};
+  rawHeaders.forEach((h, idx) => {
+    headerMap[h] = idx;
+  });
+
+  const getCol = (r: string[], colNames: string[]): string => {
+    for (const name of colNames) {
+      if (headerMap[name] !== undefined && r[headerMap[name]] !== undefined) {
+        return r[headerMap[name]].trim();
+      }
+    }
+    return '';
+  };
+
+  const list: Partial<Materi>[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const judul = getCol(r, ['judul', 'materi', 'title', 'nama', 'topik']);
+    if (!judul) continue;
+
+    list.push({
+      id: getCol(r, ['id', 'materiid', 'kodemateri']) || `mtr-${Date.now()}-${i}`,
+      judul,
+      subJudul: getCol(r, ['subjudul', 'sub_judul', 'subtitle']),
+      kategori: getCol(r, ['kategori', 'category', 'cabangolahraga']) || 'Permainan Bola Besar',
+      fase: (getCol(r, ['fase']) || 'F') as 'E' | 'F',
+      tujuanPembelajaran: getCol(r, ['tujuanpembelajaran', 'tujuan', 'capaian', 'tp']),
+      deskripsi: getCol(r, ['deskripsi', 'uraian', 'konsep', 'konsepgerak']),
+      materiInti: getCol(r, ['materiinti', 'materi_inti', 'kontenteks', 'konten']),
+      kontenTeks: getCol(r, ['kontenteks', 'materiinti', 'konten']),
+      videoUrl: getCol(r, ['videourl', 'video', 'linkvideo']),
+      fileUrl: getCol(r, ['fileurl', 'file', 'pdfurl', 'dokumen']),
+      status: (getCol(r, ['status', 'statuspublikasi']) || 'Publish') as 'Publish' | 'Draft',
+      guruNama: getCol(r, ['gurunama', 'guru', 'dibuatoleh', 'pengampu']),
+      dibuatOleh: getCol(r, ['dibuatoleh', 'gurunama', 'guru']),
+      dibuatPada: getCol(r, ['dibuatpada', 'tanggal', 'date']) || new Date().toISOString().slice(0, 10),
+    });
+  }
+  return list;
+};
+
+/**
+ * Parse CSV text to partial PenilaianPraktik objects
+ */
+export const parseCSVToNilai = (csvText: string): Partial<PenilaianPraktik>[] => {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) return [];
+
+  const rawHeaders = rows[0].map((h) => h.toLowerCase().trim().replace(/[^a-z0-9_]/g, ''));
+  const headerMap: Record<string, number> = {};
+  rawHeaders.forEach((h, idx) => {
+    headerMap[h] = idx;
+  });
+
+  const getCol = (r: string[], colNames: string[]): string => {
+    for (const name of colNames) {
+      if (headerMap[name] !== undefined && r[headerMap[name]] !== undefined) {
+        return r[headerMap[name]].trim();
+      }
+    }
+    return '';
+  };
+
+  const list: Partial<PenilaianPraktik>[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const muridNama = getCol(r, ['muridnama', 'nama', 'namamurid', 'siswa', 'namasiswa']);
+    if (!muridNama) continue;
+
+    const nilaiAkhirNum = parseFloat(getCol(r, ['nilaiakhir', 'nilai', 'skorakhir'])) || 0;
+    const totalSkorNum = parseFloat(getCol(r, ['totalskor', 'skor', 'poin'])) || 0;
+
+    list.push({
+      id: getCol(r, ['id', 'nilaiid']) || `nil-${Date.now()}-${i}`,
+      muridNama,
+      nis: getCol(r, ['nis', 'nisn']),
+      materi: getCol(r, ['materi', 'materijudul', 'judul']),
+      materiJudul: getCol(r, ['materi', 'materijudul', 'judul']),
+      kelasNama: getCol(r, ['kelasnama', 'kelas', 'rombel']),
+      nilaiAkhir: nilaiAkhirNum,
+      totalSkor: totalSkorNum,
+      predikat: (getCol(r, ['predikat', 'grade']) || 'B') as any,
+      catatanGuru: getCol(r, ['catatanguru', 'catatan', 'evaluasi']),
+      guruNama: getCol(r, ['gurunama', 'gurupenilai', 'guru']),
+      tanggal: getCol(r, ['tanggal', 'date']) || new Date().toISOString().slice(0, 10),
+    });
+  }
+  return list;
+};
+
+/**
+ * Fetch table from Google Sheets directly via Google Visualization API (GViz)
+ */
+export const fetchSheetTableViaGViz = async (
+  spreadsheetIdOrUrl: string,
+  sheetName: string
+): Promise<{
+  success: boolean;
+  data: any[];
+  csvText: string;
+  statusCode: number;
+  message: string;
+}> => {
+  const spreadsheetId = extractSpreadsheetId(spreadsheetIdOrUrl);
+  if (!spreadsheetId) {
+    return {
+      success: false,
+      data: [],
+      csvText: '',
+      statusCode: 400,
+      message: 'ID Google Spreadsheet tidak valid atau tidak ditemukan dalam URL.',
+    };
+  }
+
+  const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+
+  try {
+    const res = await fetch(gvizUrl, { method: 'GET' });
+    const statusCode = res.status;
+    const text = await res.text();
+
+    if (!res.ok) {
+      return {
+        success: false,
+        data: [],
+        csvText: text.slice(0, 300),
+        statusCode,
+        message: `HTTP ${statusCode}: Gagal membaca sheet ${sheetName}.`,
+      };
+    }
+
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      return {
+        success: false,
+        data: [],
+        csvText: text.slice(0, 300),
+        statusCode: 403,
+        message: 'Google Spreadsheet bersifat Privat. Ubah akses di menu Bagikan menjadi "Siapa saja yang memiliki tautan".',
+      };
+    }
+
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      return {
+        success: true,
+        data: [],
+        csvText: text,
+        statusCode,
+        message: `Sheet ${sheetName} kosong.`,
+      };
+    }
+
+    const headers = rows[0].map((h) => h.trim());
+    const dataList: any[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const obj: Record<string, any> = {};
+      headers.forEach((header, idx) => {
+        obj[header] = row[idx] !== undefined ? row[idx] : '';
+      });
+      dataList.push(obj);
+    }
+
+    return {
+      success: true,
+      data: dataList,
+      csvText: text,
+      statusCode,
+      message: `Berhasil membaca ${dataList.length} baris dari sheet ${sheetName}!`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      data: [],
+      csvText: '',
+      statusCode: 0,
+      message: `Gagal membaca sheet ${sheetName}: ${err?.message || ''}`,
+    };
+  }
+};
+
+/**
  * Provides ready-to-copy Google Apps Script code for users to paste into Google Sheet Extensions -> Apps Script
  */
 export const generateGoogleAppsScriptCode = (spreadsheetId?: string): string => {
@@ -692,51 +881,132 @@ export const generateGoogleAppsScriptCode = (spreadsheetId?: string): string => 
     : `var ss = SpreadsheetApp.getActiveSpreadsheet();`;
 
   return `/**
- * GOOGLE APPS SCRIPT - DUA ARAH (BIDIRECTIONAL) LMS PJOK NUSANTARA
- * Cara Pasang:
+ * GOOGLE APPS SCRIPT - DUA ARAH (BIDIRECTIONAL) RESMI LMS PJOK NUSANTARA
+ * Mendukung sinkronisasi lengkap: USERS, MATERI, NILAI (Penilaian Praktik), KELAS, TUGAS, dll.
+ * 
+ * Panduan Pasang Cepat:
  * 1. Buka Google Spreadsheet Anda.
  * 2. Klik menu 'Extensions' (Ekstensi) -> 'Apps Script'.
- * 3. Hapus kode bawaan dan tempel kode ini seluruhnya.
- * 4. Klik tombol 'Deploy' (Terapkan) -> 'New deployment' (Penerapan baru).
+ * 3. Hapus seluruh isi kode lama di Apps Script, lalu tempel (paste) kode ini.
+ * 4. Klik tombol 'Deploy' (Terapkan) berwarna biru -> 'New deployment' (Penerapan baru).
  * 5. Pilih tipe: 'Web app' (Aplikasi web).
  * 6. Set 'Execute as': 'Me' (Saya).
- * 7. Set 'Who has access': 'Anyone' (Siapa saja).
- * 8. Klik 'Deploy', izinkan akses, lalu salin 'Web app URL' ke dalam LMS PJOK!
+ * 7. PENTING: Set 'Who has access': 'Anyone' (Siapa saja).
+ * 8. Klik 'Deploy', berikan izin akun Google jika diminta, lalu salin 'Web app URL'.
+ * 9. Tempel URL Web app tersebut ke kolom Webhook di LMS PJOK!
  */
 
 function doGet(e) {
   ${openCode}
-  var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : 'USERS';
-  var sheet = ss.getSheetByName(sheetName);
-  
-  if (!sheet) {
-    sheet = ss.getSheets()[0];
-  }
-  
-  var values = sheet.getDataRange().getValues();
-  if (values.length < 2) {
-    return ContentService.createTextOutput(JSON.stringify({ headers: [], rows: [] }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  var headers = values[0];
-  var rows = [];
-  for (var i = 1; i < values.length; i++) {
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = values[i][j];
+  var sheetName = (e && e.parameter && (e.parameter.sheet || e.parameter.table)) ? (e.parameter.sheet || e.parameter.table) : 'ALL';
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
+
+  function readTable(sheet) {
+    if (!sheet) return [];
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return [];
+    var headers = values[0];
+    var rows = [];
+    for (var i = 1; i < values.length; i++) {
+      var obj = {};
+      var hasData = false;
+      for (var j = 0; j < headers.length; j++) {
+        var key = headers[j];
+        if (!key) continue;
+        var val = values[i][j];
+        if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+          try { val = JSON.parse(val); } catch(err) {}
+        }
+        obj[key] = val;
+        if (val !== '' && val !== null && val !== undefined) hasData = true;
+      }
+      if (hasData) rows.push(obj);
     }
-    rows.push(obj);
+    return rows;
   }
-  
+
+  // Jika minta SEMUA tabel (ALL) atau action=getAll
+  if (sheetName === 'ALL' || action === 'getAll') {
+    var allData = {};
+    var sheets = ss.getSheets();
+    for (var s = 0; s < sheets.length; s++) {
+      var sName = sheets[s].getName();
+      allData[sName] = readTable(sheets[s]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      success: true,
+      data: allData,
+      USERS: allData['USERS'] || [],
+      MATERI: allData['MATERI'] || [],
+      NILAI: allData['NILAI'] || [],
+      KELAS: allData['KELAS'] || [],
+      TUGAS: allData['TUGAS'] || [],
+      PRESENSI: allData['PRESENSI'] || []
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Jika minta sheet tertentu (misal: MATERI, USERS, atau NILAI)
+  var sheet = ss.getSheetByName(sheetName);
+  var rows = readTable(sheet);
   return ContentService.createTextOutput(JSON.stringify({
     status: 'success',
     success: true,
     sheet: sheetName,
     count: rows.length,
-    data: rows,
-    USERS: rows
+    data: rows
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function writeSheetTable(ss, sheetName, dataList) {
+  if (!dataList || !dataList.length) return;
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+  
+  // Ambil semua nama kolom unik
+  var headerSet = {};
+  var headers = [];
+  for (var i = 0; i < dataList.length; i++) {
+    var item = dataList[i];
+    if (item && typeof item === 'object') {
+      var keys = Object.keys(item);
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        if (!headerSet[key]) {
+          headerSet[key] = true;
+          headers.push(key);
+        }
+      }
+    }
+  }
+
+  if (headers.length === 0) return;
+
+  var rows = [headers];
+  for (var r = 0; r < dataList.length; r++) {
+    var record = dataList[r] || {};
+    var row = [];
+    for (var c = 0; c < headers.length; c++) {
+      var col = headers[c];
+      var cell = record[col];
+      if (cell === null || cell === undefined) {
+        row.push('');
+      } else if (typeof cell === 'object') {
+        row.push(JSON.stringify(cell));
+      } else {
+        row.push(String(cell));
+      }
+    }
+    rows.push(row);
+  }
+
+  sheet.clearContents();
+  sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+  try {
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#e2e8f0');
+  } catch(e) {}
 }
 
 function doPost(e) {
@@ -744,72 +1014,128 @@ function doPost(e) {
     var contents = e.postData.contents;
     var payload = JSON.parse(contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    var sheetName = payload.table || payload.sheet || 'USERS';
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-    }
-    
+
+    // 1. Sinkronisasi SEMUA Tabel (Multi-Sheet Payload dari LMS)
     if (payload.action === 'syncAll' && payload.data) {
-      // Overwrite or update all records
-      var dataList = Array.isArray(payload.data) ? payload.data : [];
-      if (dataList.length > 0) {
-        var headers = Object.keys(dataList[0]);
-        var rows = [headers];
-        for (var i = 0; i < dataList.length; i++) {
-          var row = [];
-          for (var j = 0; j < headers.length; j++) {
-            var val = dataList[i][headers[j]];
-            row.push(typeof val === 'object' ? JSON.stringify(val) : (val !== undefined ? val : ''));
+      var dataObj = payload.data;
+      var updatedCount = 0;
+      if (typeof dataObj === 'object' && !Array.isArray(dataObj)) {
+        for (var key in dataObj) {
+          if (dataObj.hasOwnProperty(key) && Array.isArray(dataObj[key])) {
+            writeSheetTable(ss, key, dataObj[key]);
+            updatedCount++;
           }
-          rows.push(row);
         }
-        sheet.clearContents();
-        sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+      } else if (Array.isArray(dataObj)) {
+        var target = payload.table || payload.sheet || 'USERS';
+        writeSheetTable(ss, target, dataObj);
+        updatedCount++;
       }
-    } else if (payload.action === 'upsertUser' && payload.data) {
-      // Add or update single user row
-      var u = payload.data;
-      var values = sheet.getDataRange().getValues();
-      var headers = values.length > 0 ? values[0] : ['id', 'username', 'role', 'name', 'nip', 'email', 'status', 'avatar'];
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Berhasil menyinkronkan ' + updatedCount + ' tabel (USERS, MATERI, NILAI, dll.) ke Spreadsheet!',
+        updatedSheets: updatedCount
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. Sinkronisasi Tabel Tunggal (misal: hanya MATERI atau hanya NILAI)
+    if ((payload.action === 'syncTable' || payload.action === 'syncMateri' || payload.action === 'syncNilai') && Array.isArray(payload.data)) {
+      var tblName = payload.table || (payload.action === 'syncMateri' ? 'MATERI' : 'NILAI');
+      writeSheetTable(ss, tblName, payload.data);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Tabel ' + tblName + ' berhasil diperbarui di Spreadsheet!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. Upsert Materi Tunggal
+    if (payload.action === 'upsertMateri' && payload.data) {
+      var m = payload.data;
+      var mSheet = ss.getSheetByName('MATERI');
+      if (!mSheet) mSheet = ss.insertSheet('MATERI');
+      var mValues = mSheet.getDataRange().getValues();
+      var mHeaders = mValues.length > 0 ? mValues[0] : ['id', 'judul', 'kategori', 'fase', 'tujuanPembelajaran', 'deskripsi', 'materiInti', 'videoUrl', 'status', 'guruNama', 'dibuatPada'];
+      if (mValues.length === 0) mSheet.appendRow(mHeaders);
       
-      if (values.length === 0) {
-        sheet.appendRow(headers);
-      }
-      
-      var foundRow = -1;
-      for (var r = 1; r < values.length; r++) {
-        if (values[r][0] == u.id || values[r][1] == u.username) {
-          foundRow = r + 1;
+      var foundMRow = -1;
+      for (var mr = 1; mr < mValues.length; mr++) {
+        if (mValues[mr][0] == m.id || (m.judul && mValues[mr][1] == m.judul)) {
+          foundMRow = mr + 1;
           break;
         }
       }
-      
-      var newRow = [
+      var newMRow = [
+        m.id || ('mtr-' + new Date().getTime()),
+        m.judul || '',
+        m.kategori || '',
+        m.fase || 'F',
+        m.tujuanPembelajaran || '',
+        m.deskripsi || '',
+        m.materiInti || m.kontenTeks || '',
+        m.videoUrl || '',
+        m.status || 'Publish',
+        m.guruNama || m.dibuatOleh || '',
+        m.dibuatPada || new Date().toISOString().slice(0, 10)
+      ];
+      if (foundMRow > 0) {
+        mSheet.getRange(foundMRow, 1, 1, newMRow.length).setValues([newMRow]);
+      } else {
+        mSheet.appendRow(newMRow);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Materi ' + (m.judul || '') + ' berhasil disimpan di Spreadsheet!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 4. Upsert User Tunggal
+    if (payload.action === 'upsertUser' && payload.data) {
+      var u = payload.data;
+      var uSheet = ss.getSheetByName('USERS');
+      if (!uSheet) uSheet = ss.insertSheet('USERS');
+      var uValues = uSheet.getDataRange().getValues();
+      var uHeaders = uValues.length > 0 ? uValues[0] : ['id', 'username', 'role', 'name', 'nip', 'nis', 'email', 'status'];
+      if (uValues.length === 0) uSheet.appendRow(uHeaders);
+
+      var foundURow = -1;
+      for (var ur = 1; ur < uValues.length; ur++) {
+        if (uValues[ur][0] == u.id || uValues[ur][1] == u.username) {
+          foundURow = ur + 1;
+          break;
+        }
+      }
+      var newURow = [
         u.id || '',
         u.username || '',
         u.role || '',
         u.name || '',
-        u.nip || u.nis || '',
+        u.nip || '',
+        u.nis || '',
         u.email || '',
-        u.status || 'Aktif',
-        u.avatar || ''
+        u.status || 'Aktif'
       ];
-      
-      if (foundRow > 0) {
-        sheet.getRange(foundRow, 1, 1, newRow.length).setValues([newRow]);
+      if (foundURow > 0) {
+        uSheet.getRange(foundURow, 1, 1, newURow.length).setValues([newURow]);
       } else {
-        sheet.appendRow(newRow);
+        uSheet.appendRow(newURow);
       }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Pengguna ' + (u.name || '') + ' berhasil disimpan di Spreadsheet!'
+      })).setMimeType(ContentService.MimeType.JSON);
     }
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', success: true, message: 'Tersinkronisasi!' }))
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', success: true, message: 'Operasi selesai.' }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', success: false, message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-}`;
+}
+`;
 };
 

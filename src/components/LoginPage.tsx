@@ -61,6 +61,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
+    const cleanPass = password.trim();
+    if (!cleanPass) {
+      setErrorMsg('Silakan masukkan kata sandi akun Anda.');
+      return;
+    }
+
+    const userNipClean = foundUser.nip ? foundUser.nip.replace(/\s+/g, '') : '';
+    const userNisClean = foundUser.nis ? foundUser.nis.trim() : '';
+    const isPasswordCorrect =
+      (foundUser.password && cleanPass === foundUser.password) ||
+      cleanPass === '123456' ||
+      (userNisClean && cleanPass === userNisClean) ||
+      (userNipClean && cleanPass === userNipClean);
+
+    if (!isPasswordCorrect) {
+      setErrorMsg('Kata sandi yang Anda masukkan salah. Kata sandi bawaan adalah 123456 (atau NIS/NIP Anda).');
+      return;
+    }
+
     handleSelect(foundUser);
   };
 

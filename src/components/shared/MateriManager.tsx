@@ -18,6 +18,10 @@ import {
   BookOpen,
   Eye,
   Upload,
+  FileSpreadsheet,
+  RefreshCw,
+  ArrowUpFromLine,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { Materi, User } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
@@ -69,6 +73,68 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
     fileUrl: '',
     status: 'Publish',
   });
+
+  // Spreadsheet Sync State & Toasts
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  const isSpreadsheetConfigured = Boolean(
+    db.settings?.spreadsheetWebhookUrl || db.settings?.spreadsheetUrl
+  );
+
+  const handlePushMateriToSheets = async () => {
+    setSyncLoading(true);
+    setSyncToast(null);
+    try {
+      const res = await dataStorage.syncMateriToLinkedSpreadsheet();
+      if (res.success) {
+        setSyncToast({
+          type: 'success',
+          text: 'Seluruh materi ajar PJOK berhasil dikirim dan tersimpan di Google Spreadsheet (Sheet MATERI)!',
+        });
+      } else {
+        setSyncToast({
+          type: 'error',
+          text: res.message || 'Gagal mengirim materi ke Spreadsheet. Pastikan URL Webhook telah diisi di pengaturan.',
+        });
+      }
+    } catch (e: any) {
+      setSyncToast({
+        type: 'error',
+        text: e?.message || 'Terjadi kesalahan saat menyinkronkan ke Spreadsheet.',
+      });
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setSyncToast(null), 5000);
+    }
+  };
+
+  const handlePullMateriFromSheets = async () => {
+    setSyncLoading(true);
+    setSyncToast(null);
+    try {
+      const res = await dataStorage.pullFromLinkedSpreadsheet();
+      if (res.success) {
+        setSyncToast({
+          type: 'success',
+          text: `Berhasil menarik data terbaru dari Spreadsheet: ${res.materiCount ?? 0} materi, ${res.count ?? 0} pengguna diperbarui!`,
+        });
+      } else {
+        setSyncToast({
+          type: 'error',
+          text: res.message || 'Gagal menarik materi dari Spreadsheet. Periksa izin sharing atau URL Webhook.',
+        });
+      }
+    } catch (e: any) {
+      setSyncToast({
+        type: 'error',
+        text: e?.message || 'Terjadi kesalahan saat menarik data dari Spreadsheet.',
+      });
+    } finally {
+      setSyncLoading(false);
+      setTimeout(() => setSyncToast(null), 5000);
+    }
+  };
 
   const categories = getMateriCategoryList(db.materi);
 
@@ -207,6 +273,13 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
         materi: [newM, ...prev.materi],
       }));
     }
+    setSyncToast({
+      type: 'success',
+      text: db.settings?.spreadsheetWebhookUrl
+        ? 'Materi berhasil disimpan dan otomatis disinkronkan ke Google Spreadsheet!'
+        : 'Materi berhasil disimpan ke database!',
+    });
+    setTimeout(() => setSyncToast(null), 4000);
     setIsModalOpen(false);
   };
 
@@ -251,6 +324,27 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {/* Tombol Sinkronisasi Spreadsheet */}
+          <button
+            onClick={handlePullMateriFromSheets}
+            disabled={syncLoading}
+            title="Tarik pembaruan materi yang diedit langsung dari Google Spreadsheet"
+            className="px-3 py-2 bg-sky-50 hover:bg-sky-100 disabled:opacity-50 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <ArrowDownToLine className={`w-3.5 h-3.5 text-sky-600 ${syncLoading ? 'animate-bounce' : ''}`} />
+            <span>Tarik dari Sheets</span>
+          </button>
+
+          <button
+            onClick={handlePushMateriToSheets}
+            disabled={syncLoading}
+            title="Kirim seluruh materi aplikasi ke lembar kerja MATERI di Google Spreadsheet"
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <ArrowUpFromLine className={`w-3.5 h-3.5 text-emerald-600 ${syncLoading ? 'animate-bounce' : ''}`} />
+            <span>Kirim ke Sheets</span>
+          </button>
+
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
@@ -260,13 +354,41 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
           </button>
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Tambah Modul PJOK</span>
           </button>
         </div>
       </div>
+
+      {/* Sync Toast Feedback */}
+      {syncToast && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs font-medium flex items-center justify-between gap-2.5 transition-all shadow-2xs ${
+            syncToast.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              : syncToast.type === 'error'
+              ? 'bg-rose-50 text-rose-800 border border-rose-200'
+              : 'bg-sky-50 text-sky-800 border border-sky-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {syncToast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{syncToast.text}</span>
+          </div>
+          <button
+            onClick={() => setSyncToast(null)}
+            className="p-1 hover:bg-black/5 rounded-lg text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">

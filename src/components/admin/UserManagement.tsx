@@ -226,7 +226,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
 
   const handleResetPassword = () => {
     if (!resetPassUser) return;
-    alert(`Password untuk pengguna ${resetPassUser.name} (${resetPassUser.username}) berhasil direset menjadi: ${newPassword}`);
+    dataStorage.updateDatabase((prev) => ({
+      ...prev,
+      users: prev.users.map((u) => (u.id === resetPassUser.id ? { ...u, password: newPassword } : u)),
+    }));
+    showToast(`Password untuk pengguna ${resetPassUser.name} (${resetPassUser.username}) berhasil direset menjadi: ${newPassword}`);
     setResetPassUser(null);
   };
 

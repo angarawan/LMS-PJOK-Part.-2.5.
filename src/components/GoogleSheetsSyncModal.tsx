@@ -707,15 +707,22 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
           {/* TAB 3: KODE APPS SCRIPT */}
           {activeTab === 'script' && (
             <div className="space-y-4">
-              <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-2">
+              <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-2.5">
                 <h4 className="text-xs font-bold text-indigo-950 uppercase flex items-center gap-1.5">
                   <Code className="w-4 h-4 text-indigo-600" />
-                  Cara Memasang Webhook di Google Sheet Anda (3 Langkah Mudah):
+                  Cara Memasang / Memperbarui Webhook Dua Arah di Google Sheet:
                 </h4>
-                <ol className="list-decimal list-inside text-xs text-indigo-900 space-y-1 pl-1 leading-relaxed">
+                <ol className="list-decimal list-inside text-xs text-indigo-900 space-y-1.5 pl-1 leading-relaxed">
                   <li>Buka Spreadsheet Google Anda, klik menu <strong>Ekstensi (Extensions) → Apps Script</strong>.</li>
-                  <li>Hapus kode bawaan, lalu salin dan tempelkan seluruh kode di bawah ini.</li>
-                  <li>Klik tombol biru <strong>Terapkan (Deploy) → Penerapan baru (New deployment)</strong>, pilih jenis <strong>Aplikasi Web (Web App)</strong>, atur akses: <em>"Siapa saja (Anyone)"</em>, lalu salin URL Web App yang muncul ke tab <strong>Sinkronisasi 2 Arah</strong>!</li>
+                  <li>Hapus kode lama di editor, lalu salin dan tempelkan seluruh kode versi terbaru di bawah ini.</li>
+                  <li>
+                    <strong>PENTING (Untuk Mengaktifkan Sinkronisasi MATERI & NILAI):</strong>
+                    <ul className="list-disc list-inside pl-3 mt-1 space-y-0.5 text-indigo-950 font-medium">
+                      <li>Jika baru pertama kali: Klik <strong>Terapkan (Deploy) → Penerapan baru (New deployment)</strong>, pilih jenis <strong>Aplikasi Web (Web App)</strong>, atur Siapa yang memiliki akses: <strong>Siapa saja (Anyone)</strong>, lalu salin URL Web App.</li>
+                      <li>Jika sudah pernah pasang sebelumnya: Klik <strong>Terapkan (Deploy) → Kelola penerapan (Manage deployments)</strong> → klik ikon pensil (Edit) → pada Versi pilih <strong>Versi Baru (New version)</strong> → klik <strong>Terapkan (Deploy)</strong>.</li>
+                    </ul>
+                  </li>
+                  <li>Tempelkan URL Web App ke tab <strong>Sinkronisasi 2 Arah</strong> di aplikasi ini. Sekarang setiap data Materi atau Nilai yang Anda input di aplikasi akan otomatis tersimpan di Sheet <code>MATERI</code> &amp; <code>NILAI</code>, dan begitu pula sebaliknya!</li>
                 </ol>
               </div>
 

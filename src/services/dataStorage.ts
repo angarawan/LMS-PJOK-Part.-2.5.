@@ -35,8 +35,11 @@ import {
   syncViaAppsScriptWebhook,
   fetchViaAppsScriptWebhook,
   fetchSheetViaGViz,
+  fetchSheetTableViaGViz,
   exportUsersToCSV,
   parseCSVToUsers,
+  parseCSVToMateri,
+  parseCSVToNilai,
   extractSpreadsheetId,
 } from './sheetsService';
 import { runSpreadsheetDiagnostics, DiagnosticReport } from './sheetsDiagnosticService';
@@ -1168,6 +1171,20 @@ class DataStorageService {
     this.notifyLocalListeners();
   }
 
+  private autoSyncTimer: any = null;
+
+  public scheduleAutoSyncToSpreadsheet() {
+    if (!this.db.settings?.spreadsheetWebhookUrl) return;
+    if (this.autoSyncTimer) {
+      clearTimeout(this.autoSyncTimer);
+    }
+    this.autoSyncTimer = setTimeout(() => {
+      this.syncToLinkedSpreadsheet().catch((e) => {
+        console.warn('Auto-sync to Google Spreadsheet:', e?.message || e);
+      });
+    }, 2500);
+  }
+
   public updateDatabase(updater: (prev: LMSDatabase) => LMSDatabase) {
     const prev = this.db;
     const next = updater(prev);
@@ -1175,6 +1192,8 @@ class DataStorageService {
     this.notify();
     // Sinkronkan perubahan secara asinkron ke Firestore
     this.syncChangesToFirestore(prev, next);
+    // Sinkronkan perubahan secara otomatis ke Google Spreadsheet jika webhook terhubung
+    this.scheduleAutoSyncToSpreadsheet();
   }
 
   public resetToDefaults() {
@@ -1496,7 +1515,14 @@ class DataStorageService {
 
   public async pullFromLinkedSpreadsheet(
     webhookUrl?: string
-  ): Promise<{ success: boolean; count: number; message: string; log?: SpreadsheetSyncLog }> {
+  ): Promise<{
+    success: boolean;
+    count: number;
+    materiCount?: number;
+    nilaiCount?: number;
+    message: string;
+    log?: SpreadsheetSyncLog;
+  }> {
     const startTime = Date.now();
     const targetUrl = webhookUrl || this.db.settings?.spreadsheetWebhookUrl || this.db.settings?.spreadsheetUrl;
     const fallbackSheetUrl = this.db.settings?.spreadsheetUrl;
@@ -1524,58 +1550,63 @@ class DataStorageService {
     }
 
     try {
-      let rawDataList: any[] = [];
+      let rawUsers: any[] = [];
+      let rawMateri: any[] = [];
+      let rawNilai: any[] = [];
       let statusCode = 200;
       let usedMethod: SpreadsheetSyncLog['method'] = 'WEBHOOK_GET';
       let syncMessage = '';
-      let isCors = false;
-      let isAuth = false;
 
-      // 1. Check if direct Spreadsheet URL
+      // 1. Direct Spreadsheet URL via GViz CSV
       if (targetUrl.includes('docs.google.com/spreadsheets')) {
         usedMethod = 'GVIZ_CSV';
-        const gvizRes = await fetchSheetViaGViz(targetUrl, 'USERS');
-        statusCode = gvizRes.statusCode;
-        if (gvizRes.success && gvizRes.data.length > 0) {
-          rawDataList = gvizRes.data;
-          syncMessage = gvizRes.message;
-        } else {
-          throw new Error(gvizRes.message);
+        const gvizUsers = await fetchSheetViaGViz(targetUrl, 'USERS');
+        statusCode = gvizUsers.statusCode;
+        if (gvizUsers.success && gvizUsers.data.length > 0) {
+          rawUsers = gvizUsers.data;
+        }
+
+        const gvizMateri = await fetchSheetTableViaGViz(targetUrl, 'MATERI');
+        if (gvizMateri.success && gvizMateri.data.length > 0) {
+          rawMateri = gvizMateri.data;
+        }
+
+        const gvizNilai = await fetchSheetTableViaGViz(targetUrl, 'NILAI');
+        if (gvizNilai.success && gvizNilai.data.length > 0) {
+          rawNilai = gvizNilai.data;
         }
       } else {
-        // 2. Apps Script Webhook
-        const res = await fetchViaAppsScriptWebhook(targetUrl, 'USERS');
+        // 2. Apps Script Webhook (Request ALL sheets)
+        const res = await fetchViaAppsScriptWebhook(targetUrl, 'ALL');
         statusCode = res.statusCode;
-        isCors = !!res.corsBlocked;
-        isAuth = !!res.authError;
 
-        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-          rawDataList = res.data;
-          syncMessage = res.message || `Berhasil mengambil ${rawDataList.length} data.`;
-        } else if (res.data?.USERS && Array.isArray(res.data.USERS) && res.data.USERS.length > 0) {
-          rawDataList = res.data.USERS;
-          syncMessage = res.message || `Berhasil mengambil ${rawDataList.length} data.`;
-        } else {
-          // If Apps Script failed, check if we have a fallback Spreadsheet URL
-          const sheetId = extractSpreadsheetId(fallbackSheetUrl || '');
+        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+          rawUsers = res.data.USERS || [];
+          rawMateri = res.data.MATERI || [];
+          rawNilai = res.data.NILAI || [];
+        } else if (Array.isArray(res.data)) {
+          rawUsers = res.data;
+        }
+
+        // Fallback to GViz if Webhook yielded no users and fallback URL exists
+        if (rawUsers.length === 0 && fallbackSheetUrl) {
+          const sheetId = extractSpreadsheetId(fallbackSheetUrl);
           if (sheetId) {
             const fallbackRes = await fetchSheetViaGViz(sheetId, 'USERS');
             if (fallbackRes.success && fallbackRes.data.length > 0) {
               usedMethod = 'GVIZ_CSV';
-              rawDataList = fallbackRes.data;
-              statusCode = fallbackRes.statusCode;
-              syncMessage = `Sinkronisasi dialihkan ke jalur Google Spreadsheet langsung (GViz CSV): ${fallbackRes.data.length} data berhasil ditarik!`;
-            } else {
-              throw new Error(res.message || 'Tidak ada data pengguna yang valid ditemukan dalam respons Google Apps Script.');
+              rawUsers = fallbackRes.data;
+              const mRes = await fetchSheetTableViaGViz(sheetId, 'MATERI');
+              if (mRes.success) rawMateri = mRes.data;
+              const nRes = await fetchSheetTableViaGViz(sheetId, 'NILAI');
+              if (nRes.success) rawNilai = nRes.data;
             }
-          } else {
-            throw new Error(res.message || 'Tidak ada data pengguna yang valid ditemukan dalam respons Google Apps Script.');
           }
         }
       }
 
-      // 3. Normalize User records
-      const mappedUsers: User[] = rawDataList.map((u: any, idx: number) => {
+      // 3. Normalize Users
+      const mappedUsers: User[] = rawUsers.map((u: any, idx: number) => {
         const rawRole = String(u.role || u.Role || u.peran || u.Peran || 'MURID').toUpperCase();
         const role = rawRole.includes('GURU') ? 'GURU' : rawRole.includes('ADMIN') ? 'ADMIN' : 'MURID';
         const rawName = u.name || u.nama || u.Nama || u.NAMA || u.namalengkap || u.nama_lengkap || `Pengguna ${idx + 1}`;
@@ -1584,6 +1615,7 @@ class DataStorageService {
         return {
           id: u.id || u.ID || `usr-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`,
           username: rawUsername,
+          password: u.password || u.kata_sandi || undefined,
           role,
           name: rawName,
           email: u.email || u.Email || '',
@@ -1597,33 +1629,125 @@ class DataStorageService {
         };
       });
 
-      if (mappedUsers.length > 0) {
-        this.updateDatabase((prev) => {
-          const map = new Map(prev.users.map((item) => [item.id, item]));
-          // Also index by username to prevent duplicates
-          const usernameMap = new Map(prev.users.map((item) => [item.username.toLowerCase(), item.id]));
-
-          mappedUsers.forEach((item: User) => {
-            const existingId = usernameMap.get(item.username.toLowerCase());
-            if (existingId && existingId !== item.id) {
-              map.set(existingId, { ...map.get(existingId), ...item, id: existingId });
-            } else {
-              map.set(item.id, { ...map.get(item.id), ...item });
-            }
-          });
-
+      // 4. Normalize Materi
+      const mappedMateri: Materi[] = rawMateri
+        .filter((m: any) => m.judul || m.Judul || m.materi || m.title)
+        .map((m: any, idx: number) => {
+          const judul = m.judul || m.Judul || m.materi || m.title || `Materi ${idx + 1}`;
+          const materiInti = m.materiInti || m.kontenTeks || m.konten || m.materi_inti || '';
           return {
-            ...prev,
-            users: Array.from(map.values()),
-            settings: {
-              ...prev.settings,
-              terakhirSinkron: new Date().toISOString(),
-            },
+            id: m.id || m.ID || `mtr-${Date.now()}-${idx}`,
+            judul,
+            subJudul: m.subJudul || m.sub_judul || '',
+            kategori: m.kategori || m.Kategori || 'Permainan Bola Besar',
+            fase: (m.fase || 'F') as 'E' | 'F',
+            semester: (m.semester || '1') as '1' | '2',
+            tujuanPembelajaran: m.tujuanPembelajaran || m.tujuan || m.capaian || '',
+            deskripsi: m.deskripsi || m.Deskripsi || m.uraian || '',
+            materiInti,
+            kontenTeks: materiInti,
+            videoUrl: m.videoUrl || m.video || '',
+            fileUrl: m.fileUrl || m.file || '',
+            status: (m.status === 'Draft' ? 'Draft' : 'Publish') as 'Publish' | 'Draft',
+            guruNama: m.guruNama || m.guru || m.dibuatOleh || 'I Ketut Sukadana, S.Pd',
+            dibuatOleh: m.dibuatOleh || m.guruNama || 'I Ketut Sukadana, S.Pd',
+            dibuatPada: m.dibuatPada || m.tanggal || new Date().toISOString().slice(0, 10),
+            kelasIds: this.db.kelas.map((k) => k.id),
           };
         });
-      }
+
+      // 5. Normalize Nilai
+      const mappedNilai: PenilaianPraktik[] = rawNilai
+        .filter((n: any) => n.muridNama || n.nama || n.siswa)
+        .map((n: any, idx: number) => {
+          const muridNama = n.muridNama || n.nama || n.siswa || '';
+          const nilaiAkhirNum = parseFloat(n.nilaiAkhir || n.nilai || 0) || 0;
+          const totalSkorNum = parseFloat(n.totalSkor || n.skor || 0) || 0;
+          const rawPred = String(n.predikat || 'B').toUpperCase();
+          const predikat = (['A', 'B', 'C', 'D'].includes(rawPred) ? rawPred : 'B') as any;
+
+          return {
+            id: n.id || `nil-${Date.now()}-${idx}`,
+            muridId: n.muridId || `murid-${idx}`,
+            muridNama,
+            nis: n.nis || '',
+            kelasId: n.kelasId || 'cls-xi-1',
+            kelasNama: n.kelasNama || n.kelas || 'XI 1',
+            materi: n.materi || n.materiJudul || 'PJOK',
+            materiJudul: n.materiJudul || n.materi || 'PJOK',
+            tanggal: n.tanggal || new Date().toISOString().slice(0, 10),
+            totalSkor: totalSkorNum,
+            nilaiAkhir: nilaiAkhirNum,
+            predikat,
+            catatanGuru: n.catatanGuru || n.catatan || '',
+            guruNama: n.guruNama || n.guruPenilai || 'I Ketut Sukadana, S.Pd',
+            guruPenilai: n.guruPenilai || n.guruNama || 'I Ketut Sukadana, S.Pd',
+          };
+        });
+
+      // 6. Merge into Database
+      this.updateDatabase((prev) => {
+        let newUsers = [...prev.users];
+        if (mappedUsers.length > 0) {
+          const userMap = new Map(newUsers.map((u) => [u.id, u]));
+          const usernameMap = new Map(newUsers.map((u) => [u.username.toLowerCase(), u.id]));
+          mappedUsers.forEach((u) => {
+            const existingId = usernameMap.get(u.username.toLowerCase());
+            if (existingId && existingId !== u.id) {
+              userMap.set(existingId, { ...userMap.get(existingId), ...u, id: existingId });
+            } else {
+              userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...u });
+            }
+          });
+          newUsers = Array.from(userMap.values());
+        }
+
+        let newMateri = [...prev.materi];
+        if (mappedMateri.length > 0) {
+          const materiMap = new Map(newMateri.map((m) => [m.id, m]));
+          const judulMap = new Map(newMateri.map((m) => [m.judul.trim().toLowerCase(), m.id]));
+          mappedMateri.forEach((m) => {
+            const existingId = judulMap.get(m.judul.trim().toLowerCase());
+            if (existingId) {
+              materiMap.set(existingId, { ...materiMap.get(existingId), ...m, id: existingId });
+            } else {
+              materiMap.set(m.id, { ...(materiMap.get(m.id) || {}), ...m });
+            }
+          });
+          newMateri = Array.from(materiMap.values());
+        }
+
+        let newNilai = [...(prev.penilaianPraktik || [])];
+        if (mappedNilai.length > 0) {
+          const nilaiMap = new Map(newNilai.map((n) => [n.id, n]));
+          const pairMap = new Map(newNilai.map((n) => [`${n.muridNama}_${n.materi || n.materiJudul}`.toLowerCase(), n.id]));
+          mappedNilai.forEach((n) => {
+            const key = `${n.muridNama}_${n.materi || n.materiJudul}`.toLowerCase();
+            const existingId = pairMap.get(key);
+            if (existingId) {
+              nilaiMap.set(existingId, { ...nilaiMap.get(existingId), ...n, id: existingId });
+            } else {
+              nilaiMap.set(n.id, { ...(nilaiMap.get(n.id) || {}), ...n });
+            }
+          });
+          newNilai = Array.from(nilaiMap.values());
+        }
+
+        return {
+          ...prev,
+          users: newUsers,
+          materi: newMateri,
+          penilaianPraktik: newNilai,
+          settings: {
+            ...prev.settings,
+            terakhirSinkron: new Date().toISOString(),
+          },
+        };
+      });
 
       const durationMs = Date.now() - startTime;
+      syncMessage = `Berhasil menarik data dari Spreadsheet: ${mappedUsers.length} pengguna, ${mappedMateri.length} materi pembelajaran, dan ${mappedNilai.length} rekap nilai!`;
+
       const successLog: SpreadsheetSyncLog = {
         id: `log-${Date.now()}`,
         timestamp: new Date().toLocaleTimeString('id-ID'),
@@ -1633,15 +1757,17 @@ class DataStorageService {
         httpStatus: statusCode,
         durationMs,
         success: true,
-        recordsCount: mappedUsers.length,
-        message: syncMessage || `Berhasil menarik ${mappedUsers.length} data dari Spreadsheet!`,
+        recordsCount: mappedUsers.length + mappedMateri.length + mappedNilai.length,
+        message: syncMessage,
       };
       this.addSyncLog(successLog);
 
       return {
         success: true,
         count: mappedUsers.length,
-        message: syncMessage || `Berhasil menarik ${mappedUsers.length} data dari Spreadsheet!`,
+        materiCount: mappedMateri.length,
+        nilaiCount: mappedNilai.length,
+        message: syncMessage,
         log: successLog,
       };
     } catch (err: any) {
@@ -1668,7 +1794,7 @@ class DataStorageService {
           ? 'Pastikan Google Apps Script di-deploy dengan "Who has access: Anyone (Siapa saja)". Atau gunakan link Google Spreadsheet dengan izin "Siapa saja dengan link dapat melihat".'
           : isAuth
           ? 'Akses Spreadsheet ditolak oleh Google. Ubah izin berbagi Google Sheets menjadi "Siapa saja yang memiliki tautan" sebagai Pelihat.'
-          : 'Periksa URL dan pastikan lembar kerja "USERS" memiliki header id, username, role, name, nip, email.',
+          : 'Periksa URL dan pastikan tab USERS dan MATERI tersedia.',
       };
       this.addSyncLog(errLog);
 
@@ -1681,16 +1807,102 @@ class DataStorageService {
     }
   }
 
+  // Khusus sinkronisasi Materi ke Google Sheets (Push)
+  public async syncMateriToLinkedSpreadsheet(webhookUrl?: string): Promise<{ success: boolean; message: string }> {
+    const url = webhookUrl || this.db.settings?.spreadsheetWebhookUrl;
+    if (!url) {
+      return { success: false, message: 'URL Webhook Google Apps Script belum diatur.' };
+    }
+    const payload = this.toSheetsPayload();
+    const res = await syncViaAppsScriptWebhook(url, {
+      action: 'syncMateri',
+      table: 'MATERI',
+      data: payload.MATERI,
+    });
+    return res;
+  }
+
+  // Khusus sinkronisasi Nilai ke Google Sheets (Push)
+  public async syncNilaiToLinkedSpreadsheet(webhookUrl?: string): Promise<{ success: boolean; message: string }> {
+    const url = webhookUrl || this.db.settings?.spreadsheetWebhookUrl;
+    if (!url) {
+      return { success: false, message: 'URL Webhook Google Apps Script belum diatur.' };
+    }
+    const payload = this.toSheetsPayload();
+    const res = await syncViaAppsScriptWebhook(url, {
+      action: 'syncNilai',
+      table: 'NILAI',
+      data: payload.NILAI,
+    });
+    return res;
+  }
 
   // Format data for Google Sheets tables
   public toSheetsPayload(): Record<string, any[]> {
     return {
-      USERS: this.db.users,
-      ADMIN: this.db.users.filter((u) => u.role === 'ADMIN'),
-      GURU: this.db.users.filter((u) => u.role === 'GURU'),
-      MURID: this.db.users.filter((u) => u.role === 'MURID'),
+      USERS: this.db.users.map((u) => ({
+        id: u.id,
+        username: u.username,
+        role: u.role,
+        name: u.name,
+        nip: u.nip || '',
+        nis: u.nis || '',
+        email: u.email || '',
+        status: u.status || 'Aktif',
+      })),
+      ADMIN: this.db.users.filter((u) => u.role === 'ADMIN').map((u) => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        nip: u.nip || '',
+        email: u.email || '',
+      })),
+      GURU: this.db.users.filter((u) => u.role === 'GURU').map((u) => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        nip: u.nip || '',
+        mataPelajaran: u.mataPelajaran || 'PJOK',
+        email: u.email || '',
+      })),
+      MURID: this.db.users.filter((u) => u.role === 'MURID').map((u) => ({
+        id: u.id,
+        nis: u.nis || '',
+        nisn: u.nisn || '',
+        name: u.name,
+        kelasId: u.kelasId || 'cls-xi-1',
+        jenisKelamin: u.jenisKelamin || 'L',
+      })),
       KELAS: this.db.kelas,
-      MATERI: this.db.materi,
+      MATERI: this.db.materi.map((m) => ({
+        id: m.id,
+        judul: m.judul,
+        subJudul: m.subJudul || '',
+        kategori: m.kategori || 'Permainan Bola Besar',
+        fase: m.fase || 'F',
+        semester: m.semester || '1',
+        tujuanPembelajaran: m.tujuanPembelajaran || '',
+        deskripsi: m.deskripsi || '',
+        materiInti: m.materiInti || m.kontenTeks || '',
+        videoUrl: m.videoUrl || '',
+        fileUrl: m.fileUrl || '',
+        status: m.status || 'Publish',
+        guruNama: m.guruNama || m.dibuatOleh || 'I Ketut Sukadana, S.Pd',
+        dibuatPada: m.dibuatPada || '',
+      })),
+      NILAI: (this.db.penilaianPraktik || []).map((p) => ({
+        id: p.id,
+        tanggal: p.tanggal || new Date().toISOString().slice(0, 10),
+        kelasNama: p.kelasNama || '',
+        muridNama: p.muridNama || '',
+        nis: p.nis || '',
+        materi: p.materi || p.materiJudul || '',
+        totalSkor: p.totalSkor || 0,
+        nilaiAkhir: p.nilaiAkhir || 0,
+        predikat: p.predikat || 'B',
+        catatanGuru: p.catatanGuru || '',
+        guruNama: p.guruNama || p.guruPenilai || 'I Ketut Sukadana, S.Pd',
+      })),
       TUGAS: this.db.tugas,
       PENGUMPULAN: this.db.pengumpulanTugas,
       QUIZ: this.db.quiz.map((q: any) => {
@@ -1704,7 +1916,6 @@ class DataStorageService {
       SOAL: this.db.quiz.flatMap((q) => q.soalList || q.soal || []),
       JAWABAN: this.db.jawabanQuiz,
       PRESENSI: this.db.presensi,
-      NILAI: this.db.penilaianPraktik,
       JURNAL: this.db.jurnal,
       NOTIFIKASI: this.db.notifikasi,
       SETTING: [this.db.settings],
