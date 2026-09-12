@@ -22,7 +22,7 @@ import {
   Table as TableIcon,
 } from 'lucide-react';
 import { LMSDatabase } from '../../services/dataStorage';
-import { User } from '../../types';
+import { User, getTeacherAssignedClasses } from '../../types';
 
 interface GuruDashboardProps {
   db: LMSDatabase;
@@ -32,9 +32,43 @@ interface GuruDashboardProps {
 
 export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, onNavigate }) => {
   const [attendancePeriod, setAttendancePeriod] = useState<'ALL' | 'TODAY'>('ALL');
+  const [classFilter, setClassFilter] = useState<'ASSIGNED' | 'ALL' | string>('ASSIGNED');
 
-  const totalKelas = db.kelas.length;
-  const totalMurid = db.users.filter((u) => u.role === 'MURID').length;
+  const assignedClasses = useMemo(() => {
+    return getTeacherAssignedClasses(currentUser, db.kelas);
+  }, [currentUser, db.kelas]);
+
+  const activeClasses = useMemo(() => {
+    if (classFilter === 'ASSIGNED') {
+      return assignedClasses.length > 0 ? assignedClasses : db.kelas;
+    }
+    if (classFilter === 'ALL') {
+      return db.kelas;
+    }
+    return db.kelas.filter((k) => k.id === classFilter);
+  }, [classFilter, assignedClasses, db.kelas]);
+
+  const activeClassIds = useMemo(() => new Set(activeClasses.map((k) => k.id)), [activeClasses]);
+  const activeClassNames = useMemo(
+    () => new Set(activeClasses.map((k) => (k.nama || '').toLowerCase().trim())),
+    [activeClasses]
+  );
+
+  const filteredMurid = useMemo(() => {
+    return db.users.filter((u) => {
+      if (u.role !== 'MURID') return false;
+      const uKelas = (u.kelasId || '').toLowerCase().trim();
+      return (
+        activeClassIds.has(u.kelasId || '') ||
+        activeClassNames.has(uKelas)
+      );
+    });
+  }, [db.users, activeClassIds, activeClassNames]);
+
+  const filteredStudentIds = useMemo(() => new Set(filteredMurid.map((m) => m.id)), [filteredMurid]);
+
+  const totalKelas = activeClasses.length;
+  const totalMurid = filteredMurid.length;
   const totalMateri = db.materi.length;
   const totalTugas = db.tugas.length;
   const totalQuiz = db.quiz.length;
@@ -47,12 +81,19 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
     year: 'numeric',
   });
 
-  const presensiToday = (db.presensi || []).filter((p) => p.tanggal === todayDate);
+  const presensiToday = (db.presensi || []).filter((p) => {
+    if (p.tanggal !== todayDate) return false;
+    return (
+      filteredStudentIds.has(p.muridId) ||
+      activeClassIds.has(p.kelasId || '') ||
+      activeClassNames.has((p.kelasNama || '').toLowerCase().trim())
+    );
+  });
   const hadirToday = presensiToday.filter((p) => p.status === 'H').length;
 
-  // Rekapitulasi Kehadiran & Kedisiplinan Per Rombel/Kelas
+  // Rekapitulasi Kehadiran & Kedisiplinan Per Rombel/Kelas yang Aktif
   const classAttendanceSummaries = useMemo(() => {
-    return db.kelas.map((k) => {
+    return activeClasses.map((k) => {
       const targetId = (k.id || '').toLowerCase().trim();
       const targetNama = (k.nama || '').toLowerCase().trim();
 
@@ -107,7 +148,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
         disciplineLevel,
       };
     });
-  }, [db.kelas, db.users, db.presensi, attendancePeriod, todayDate]);
+  }, [activeClasses, db.users, db.presensi, attendancePeriod, todayDate]);
 
   // Statistik Global Seluruh Kelas
   const globalAttendanceStats = useMemo(() => {
@@ -223,32 +264,104 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
         <div className="relative z-10 max-w-2xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-semibold backdrop-blur-md text-emerald-200">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Selamat Datang, {currentUser.name} • Guru Pengampu PJOK</span>
+            <span>
+              Selamat Datang, {currentUser.name}
+              {assignedClasses.length > 0 && ` • Mengampu Kelas: ${assignedClasses.map((k) => k.nama).join(', ')}`}
+            </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
             Ruang Guru LMS PJOK
           </h2>
           <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-            Pantau kemajuan motorik siswa Fase F, berikan penilaian praktik berdasar rubrik 6 kriteria,
+            Pantau kemajuan motorik siswa Fase F pada kelas yang Anda ampu, berikan penilaian praktik berdasar rubrik 6 kriteria,
             periksa tugas video passing/dribble, dan rekap nilai akhir untuk rapor sekolah.
           </p>
 
           <div className="pt-3 flex flex-wrap gap-2.5">
             <button
               onClick={() => onNavigate('praktik')}
-              className="px-4 py-2 bg-white text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors shadow-xs flex items-center gap-1.5"
+              className="px-4 py-2 bg-white text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Activity className="w-4 h-4 text-emerald-600" />
               Beri Penilaian Praktik
             </button>
             <button
               onClick={() => onNavigate('presensi')}
-              className="px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <CalendarCheck className="w-4 h-4" />
               Isi Presensi Lapangan
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Class Scope Selector for Multi-Teacher */}
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+            <School className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs font-bold text-slate-800">
+                Cakupan Rombel Dashboard:
+              </h3>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                {classFilter === 'ASSIGNED'
+                  ? `Kelas yang Anda Ampu (${assignedClasses.map((k) => k.nama).join(', ') || 'Semua'})`
+                  : classFilter === 'ALL'
+                  ? 'Semua Kelas Sekolah (XI 1 - XI 7)'
+                  : `Kelas ${activeClasses[0]?.nama || ''}`}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Statistik kehadiran, murid ({totalMurid} siswa), dan penilaian disaring sesuai kelas yang Anda pilih.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {assignedClasses.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setClassFilter('ASSIGNED')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                classFilter === 'ASSIGNED'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Kelas Diampu ({assignedClasses.length})
+            </button>
+          )}
+
+          {assignedClasses.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              onClick={() => setClassFilter(k.id)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                classFilter === k.id
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              {k.nama}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setClassFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              classFilter === 'ALL'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+          >
+            Semua Rombel
+          </button>
         </div>
       </div>
 

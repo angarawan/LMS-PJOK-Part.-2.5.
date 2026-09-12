@@ -881,19 +881,28 @@ export const generateGoogleAppsScriptCode = (spreadsheetId?: string): string => 
     : `var ss = SpreadsheetApp.getActiveSpreadsheet();`;
 
   return `/**
- * GOOGLE APPS SCRIPT - DUA ARAH (BIDIRECTIONAL) RESMI LMS PJOK NUSANTARA
- * Mendukung sinkronisasi lengkap: USERS, MATERI, NILAI (Penilaian Praktik), KELAS, TUGAS, dll.
+ * =========================================================================
+ * GOOGLE APPS SCRIPT - SINKRONISASI 2 ARAH (BIDIRECTIONAL) LMS PJOK
+ * =========================================================================
+ * Mendukung sinkronisasi penuh antara Google Spreadsheet & Aplikasi LMS:
+ * - USERS & GURU (termasuk pembagian kelas diampu guru: "XI 1, XI 2, dll")
+ * - MURID & KELAS (data rombel dan penugasan guru)
+ * - MATERI (input materi di aplikasi masuk ke spreadsheet, dan sebaliknya)
+ * - NILAI (penilaian praktik dan rekap nilai otomatis)
+ * - PRESENSI, TUGAS, QUIZ, & JURNAL
  * 
- * Panduan Pasang Cepat:
- * 1. Buka Google Spreadsheet Anda.
- * 2. Klik menu 'Extensions' (Ekstensi) -> 'Apps Script'.
+ * ATURAN DAN PANDUAN PENERAPAN (DEPLOY):
+ * 1. Buka Spreadsheet Google Anda.
+ * 2. Klik menu 'Ekstensi' (Extensions) -> 'Apps Script'.
  * 3. Hapus seluruh isi kode lama di Apps Script, lalu tempel (paste) kode ini.
  * 4. Klik tombol 'Deploy' (Terapkan) berwarna biru -> 'New deployment' (Penerapan baru).
+ *    (Jika sudah pernah deploy: Klik 'Manage deployments' -> Edit -> Versi Baru).
  * 5. Pilih tipe: 'Web app' (Aplikasi web).
- * 6. Set 'Execute as': 'Me' (Saya).
+ * 6. Set 'Execute as': 'Me' (Saya / Akun Anda).
  * 7. PENTING: Set 'Who has access': 'Anyone' (Siapa saja).
- * 8. Klik 'Deploy', berikan izin akun Google jika diminta, lalu salin 'Web app URL'.
- * 9. Tempel URL Web app tersebut ke kolom Webhook di LMS PJOK!
+ * 8. Klik 'Deploy', izinkan akses (Grant Access), lalu salin 'Web app URL'.
+ * 9. Tempelkan URL Web App tersebut ke modal Sinkronisasi di aplikasi LMS!
+ * =========================================================================
  */
 
 function doGet(e) {
@@ -914,9 +923,18 @@ function doGet(e) {
         var key = headers[j];
         if (!key) continue;
         var val = values[i][j];
-        if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+
+        // Format dates into YYYY-MM-DD
+        if (val instanceof Date) {
+          try {
+            val = Utilities.formatDate(val, Session.getScriptTimeZone() || 'Asia/Makassar', 'yyyy-MM-dd');
+          } catch(dErr) {
+            val = val.toISOString().slice(0, 10);
+          }
+        } else if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
           try { val = JSON.parse(val); } catch(err) {}
         }
+
         obj[key] = val;
         if (val !== '' && val !== null && val !== undefined) hasData = true;
       }
@@ -938,17 +956,19 @@ function doGet(e) {
       success: true,
       data: allData,
       USERS: allData['USERS'] || [],
+      GURU: allData['GURU'] || [],
+      MURID: allData['MURID'] || [],
+      KELAS: allData['KELAS'] || [],
       MATERI: allData['MATERI'] || [],
       NILAI: allData['NILAI'] || [],
-      KELAS: allData['KELAS'] || [],
-      TUGAS: allData['TUGAS'] || [],
-      PRESENSI: allData['PRESENSI'] || []
+      PRESENSI: allData['PRESENSI'] || [],
+      TUGAS: allData['TUGAS'] || []
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Jika minta sheet tertentu (misal: MATERI, USERS, atau NILAI)
-  var sheet = ss.getSheetByName(sheetName);
-  var rows = readTable(sheet);
+  // Jika minta sheet spesifik (misal: MATERI, USERS, atau NILAI)
+  var targetSheet = ss.getSheetByName(sheetName);
+  var rows = readTable(targetSheet);
   return ContentService.createTextOutput(JSON.stringify({
     status: 'success',
     success: true,
@@ -1004,8 +1024,17 @@ function writeSheetTable(ss, sheetName, dataList) {
 
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
+
+  // Rapikan format lembar kerja
   try {
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#e2e8f0');
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#0f766e')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    for (var colIdx = 1; colIdx <= Math.min(headers.length, 12); colIdx++) {
+      sheet.autoResizeColumn(colIdx);
+    }
   } catch(e) {}
 }
 
@@ -1034,14 +1063,14 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
         success: true,
-        message: 'Berhasil menyinkronkan ' + updatedCount + ' tabel (USERS, MATERI, NILAI, dll.) ke Spreadsheet!',
+        message: 'Berhasil menyinkronkan ' + updatedCount + ' tabel ke Spreadsheet!',
         updatedSheets: updatedCount
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 2. Sinkronisasi Tabel Tunggal (misal: hanya MATERI atau hanya NILAI)
-    if ((payload.action === 'syncTable' || payload.action === 'syncMateri' || payload.action === 'syncNilai') && Array.isArray(payload.data)) {
-      var tblName = payload.table || (payload.action === 'syncMateri' ? 'MATERI' : 'NILAI');
+    // 2. Sinkronisasi Tabel Tunggal (misal: hanya MATERI, NILAI, atau USERS)
+    if ((payload.action === 'syncTable' || payload.action === 'syncMateri' || payload.action === 'syncNilai' || payload.action === 'syncUsers') && Array.isArray(payload.data)) {
+      var tblName = payload.table || (payload.action === 'syncMateri' ? 'MATERI' : payload.action === 'syncNilai' ? 'NILAI' : 'USERS');
       writeSheetTable(ss, tblName, payload.data);
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
@@ -1050,14 +1079,19 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. Upsert Materi Tunggal
+    // 3. Upsert Materi Tunggal (Materi baru/diedit di aplikasi masuk langsung ke Spreadsheet)
     if (payload.action === 'upsertMateri' && payload.data) {
       var m = payload.data;
       var mSheet = ss.getSheetByName('MATERI');
       if (!mSheet) mSheet = ss.insertSheet('MATERI');
       var mValues = mSheet.getDataRange().getValues();
-      var mHeaders = mValues.length > 0 ? mValues[0] : ['id', 'judul', 'kategori', 'fase', 'tujuanPembelajaran', 'deskripsi', 'materiInti', 'videoUrl', 'status', 'guruNama', 'dibuatPada'];
-      if (mValues.length === 0) mSheet.appendRow(mHeaders);
+      var mHeaders = mValues.length > 0 ? mValues[0] : [
+        'id', 'judul', 'subJudul', 'kategori', 'fase', 'semester', 'tujuanPembelajaran', 'deskripsi', 'materiInti', 'videoUrl', 'status', 'guruNama', 'dibuatPada'
+      ];
+      if (mValues.length === 0) {
+        mSheet.appendRow(mHeaders);
+        mSheet.getRange(1, 1, 1, mHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      }
       
       var foundMRow = -1;
       for (var mr = 1; mr < mValues.length; mr++) {
@@ -1069,15 +1103,17 @@ function doPost(e) {
       var newMRow = [
         m.id || ('mtr-' + new Date().getTime()),
         m.judul || '',
-        m.kategori || '',
+        m.subJudul || '',
+        m.kategori || 'Permainan Bola Besar',
         m.fase || 'F',
+        m.semester || '1',
         m.tujuanPembelajaran || '',
         m.deskripsi || '',
         m.materiInti || m.kontenTeks || '',
         m.videoUrl || '',
         m.status || 'Publish',
         m.guruNama || m.dibuatOleh || '',
-        m.dibuatPada || new Date().toISOString().slice(0, 10)
+        m.dibuatPada || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Makassar', 'yyyy-MM-dd')
       ];
       if (foundMRow > 0) {
         mSheet.getRange(foundMRow, 1, 1, newMRow.length).setValues([newMRow]);
@@ -1087,18 +1123,23 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
         success: true,
-        message: 'Materi ' + (m.judul || '') + ' berhasil disimpan di Spreadsheet!'
+        message: 'Materi "' + (m.judul || '') + '" berhasil disimpan ke Spreadsheet!'
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 4. Upsert User Tunggal
+    // 4. Upsert User Tunggal (termasuk kelasDiampu untuk multi-guru)
     if (payload.action === 'upsertUser' && payload.data) {
       var u = payload.data;
       var uSheet = ss.getSheetByName('USERS');
       if (!uSheet) uSheet = ss.insertSheet('USERS');
       var uValues = uSheet.getDataRange().getValues();
-      var uHeaders = uValues.length > 0 ? uValues[0] : ['id', 'username', 'role', 'name', 'nip', 'nis', 'email', 'status'];
-      if (uValues.length === 0) uSheet.appendRow(uHeaders);
+      var uHeaders = uValues.length > 0 ? uValues[0] : [
+        'id', 'username', 'role', 'name', 'nip', 'nis', 'email', 'status', 'kelasDiampu', 'kelasId'
+      ];
+      if (uValues.length === 0) {
+        uSheet.appendRow(uHeaders);
+        uSheet.getRange(1, 1, 1, uHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      }
 
       var foundURow = -1;
       for (var ur = 1; ur < uValues.length; ur++) {
@@ -1108,14 +1149,16 @@ function doPost(e) {
         }
       }
       var newURow = [
-        u.id || '',
+        u.id || ('usr-' + new Date().getTime()),
         u.username || '',
-        u.role || '',
+        u.role || 'MURID',
         u.name || '',
         u.nip || '',
         u.nis || '',
         u.email || '',
-        u.status || 'Aktif'
+        u.status || 'Aktif',
+        Array.isArray(u.kelasDiampu) ? u.kelasDiampu.join(', ') : (u.kelasDiampu || ''),
+        u.kelasId || ''
       ];
       if (foundURow > 0) {
         uSheet.getRange(foundURow, 1, 1, newURow.length).setValues([newURow]);
@@ -1125,7 +1168,110 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
         success: true,
-        message: 'Pengguna ' + (u.name || '') + ' berhasil disimpan di Spreadsheet!'
+        message: 'Pengguna "' + (u.name || '') + '" berhasil disimpan di Spreadsheet!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 5. Upsert Nilai Praktik Tunggal
+    if (payload.action === 'upsertNilai' && payload.data) {
+      var n = payload.data;
+      var nSheet = ss.getSheetByName('NILAI');
+      if (!nSheet) nSheet = ss.insertSheet('NILAI');
+      var nValues = nSheet.getDataRange().getValues();
+      var nHeaders = nValues.length > 0 ? nValues[0] : [
+        'id', 'tanggal', 'kelasNama', 'muridNama', 'nis', 'materi', 'totalSkor', 'nilaiAkhir', 'predikat', 'catatanGuru', 'guruNama'
+      ];
+      if (nValues.length === 0) {
+        nSheet.appendRow(nHeaders);
+        nSheet.getRange(1, 1, 1, nHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      }
+
+      var foundNRow = -1;
+      for (var nr = 1; nr < nValues.length; nr++) {
+        if (nValues[nr][0] == n.id || (nValues[nr][3] == n.muridNama && nValues[nr][5] == (n.materi || n.materiJudul))) {
+          foundNRow = nr + 1;
+          break;
+        }
+      }
+      var newNRow = [
+        n.id || ('nil-' + new Date().getTime()),
+        n.tanggal || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Makassar', 'yyyy-MM-dd'),
+        n.kelasNama || '',
+        n.muridNama || '',
+        n.nis || '',
+        n.materi || n.materiJudul || '',
+        n.totalSkor || 0,
+        n.nilaiAkhir || 0,
+        n.predikat || 'B',
+        n.catatanGuru || '',
+        n.guruNama || n.guruPenilai || ''
+      ];
+      if (foundNRow > 0) {
+        nSheet.getRange(foundNRow, 1, 1, newNRow.length).setValues([newNRow]);
+      } else {
+        nSheet.appendRow(newNRow);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Nilai siswa "' + (n.muridNama || '') + '" berhasil disimpan di Spreadsheet!'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 6. Upsert Presensi
+    if (payload.action === 'upsertPresensi' && payload.data) {
+      var pr = payload.data;
+      var prSheet = ss.getSheetByName('PRESENSI');
+      if (!prSheet) prSheet = ss.insertSheet('PRESENSI');
+      var prValues = prSheet.getDataRange().getValues();
+      var prHeaders = prValues.length > 0 ? prValues[0] : [
+        'id', 'tanggal', 'kelasId', 'kelasNama', 'pertemuanKe', 'materi', 'waktuMulai', 'guruNama', 'totalHadir', 'totalIzin', 'totalSakit', 'totalAlpa'
+      ];
+      if (prValues.length === 0) {
+        prSheet.appendRow(prHeaders);
+        prSheet.getRange(1, 1, 1, prHeaders.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      }
+
+      var recordsList = pr.records || [];
+      var hadir = 0, izin = 0, sakit = 0, alpa = 0;
+      for (var rk = 0; rk < recordsList.length; rk++) {
+        var st = recordsList[rk].status;
+        if (st === 'H') hadir++;
+        else if (st === 'I') izin++;
+        else if (st === 'S') sakit++;
+        else if (st === 'A') alpa++;
+      }
+
+      var foundPRRow = -1;
+      for (var prr = 1; prr < prValues.length; prr++) {
+        if (prValues[prr][0] == pr.id || (prValues[prr][1] == pr.tanggal && prValues[prr][2] == pr.kelasId)) {
+          foundPRRow = prr + 1;
+          break;
+        }
+      }
+      var newPRRow = [
+        pr.id || ('prs-' + new Date().getTime()),
+        pr.tanggal || Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Makassar', 'yyyy-MM-dd'),
+        pr.kelasId || '',
+        pr.kelasNama || '',
+        pr.pertemuanKe || 1,
+        pr.materi || '',
+        pr.waktuMulai || '',
+        pr.guruNama || '',
+        hadir,
+        izin,
+        sakit,
+        alpa
+      ];
+      if (foundPRRow > 0) {
+        prSheet.getRange(foundPRRow, 1, 1, newPRRow.length).setValues([newPRRow]);
+      } else {
+        prSheet.appendRow(newPRRow);
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        success: true,
+        message: 'Presensi kelas ' + (pr.kelasNama || '') + ' berhasil disimpan di Spreadsheet!'
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

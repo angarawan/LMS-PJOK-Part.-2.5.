@@ -742,6 +742,95 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
                   {generateGoogleAppsScriptCode(activeSettings.googleSpreadsheetId || '')}
                 </pre>
               </div>
+
+              {/* ATURAN & STRUKTUR TABEL SPREADSHEET */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <h4 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  Aturan Struktur Lembar Kerja (Sheet) & Kolom Spreadsheet LMS PJOK:
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Kode Apps Script di atas akan otomatis membuat dan memformat lembar kerja berikut. Anda juga dapat mengedit atau mengisi data langsung di Google Spreadsheet dengan mengikuti panduan kolom di bawah:
+                </p>
+
+                <div className="space-y-2.5 text-xs">
+                  {/* Sheet MATERI */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-900 rounded font-mono text-[11px]">MATERI</span>
+                        Modul & Materi Pembelajaran PJOK
+                      </span>
+                      <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">2 Arah Otomatis</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Kolom:</strong> <code className="text-slate-800 font-mono text-[10px]">id, judul, subJudul, kategori, fase, semester, tujuanPembelajaran, deskripsi, materiInti, videoUrl, status, guruNama, dibuatPada</code>
+                    </p>
+                    <p className="text-[11px] text-slate-500 italic">
+                      * Materi yang diinput lewat aplikasi otomatis masuk ke lembar kerja ini. Jika Anda menambah materi baru di spreadsheet, cukup klik &quot;Tarik dari Sheets&quot; pada modul materi aplikasi.
+                    </p>
+                  </div>
+
+                  {/* Sheet GURU */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-900 rounded font-mono text-[11px]">GURU</span>
+                        Data Guru & Pembagian Kelas Diampu
+                      </span>
+                      <span className="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full font-medium">Multi-Guru Support</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Kolom:</strong> <code className="text-slate-800 font-mono text-[10px]">id, username, name, nip, mataPelajaran, email, kelasDiampu, status</code>
+                    </p>
+                    <p className="text-[11px] text-indigo-950 font-medium bg-indigo-50/70 p-1.5 rounded border border-indigo-100">
+                      <strong>Aturan Kolom <code>kelasDiampu</code>:</strong> Tuliskan nama-nama rombel yang diampu guru dipisahkan koma, contoh: <code className="bg-white px-1 py-0.5 rounded border border-indigo-200">XI 1, XI 2, XI 3</code>. Guru hanya akan melihat dan mengelola data kelas yang diampunya saat login.
+                    </p>
+                  </div>
+
+                  {/* Sheet MURID */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sky-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-sky-100 text-sky-900 rounded font-mono text-[11px]">MURID</span>
+                        Daftar Siswa & Rombel
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Kolom:</strong> <code className="text-slate-800 font-mono text-[10px]">id, nis, nisn, name, kelasId, kelasNama, jenisKelamin, status</code>
+                    </p>
+                    <p className="text-[11px] text-slate-500 italic">
+                      * Kolom <code>kelasNama</code> (misal: &quot;XI 1&quot;) akan otomatis mengelompokkan siswa ke kelas bersangkutan di LMS.
+                    </p>
+                  </div>
+
+                  {/* Sheet NILAI */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded font-mono text-[11px]">NILAI</span>
+                        Rekap Penilaian Praktik PJOK
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Kolom:</strong> <code className="text-slate-800 font-mono text-[10px]">id, tanggal, kelasNama, muridNama, nis, materi, totalSkor, nilaiAkhir, predikat, catatanGuru, guruNama</code>
+                    </p>
+                  </div>
+
+                  {/* Sheet PRESENSI */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-teal-800 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-teal-100 text-teal-900 rounded font-mono text-[11px]">PRESENSI</span>
+                        Rekap Kehadiran Harian Rombel
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Kolom:</strong> <code className="text-slate-800 font-mono text-[10px]">id, tanggal, kelasId, kelasNama, pertemuanKe, materi, waktuMulai, guruNama, totalHadir, totalIzin, totalSakit, totalAlpa</code>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

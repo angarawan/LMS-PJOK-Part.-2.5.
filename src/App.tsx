@@ -42,13 +42,10 @@ import { LoginPage } from './components/LoginPage';
 export default function App() {
   const [db, setDb] = useState<LMSDatabase>(dataStorage.getDatabase());
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    // When opening the link fresh, the initial main view should be the login screen
+    // Keep user logged in persistently across tab switching, closing tab, or opening in new tab
     try {
-      const isSessionActive = sessionStorage.getItem('lms_pjok_session_active');
-      if (isSessionActive === 'true') {
-        const savedUser = dataStorage.getCurrentUser();
-        if (savedUser) return savedUser;
-      }
+      const savedUser = dataStorage.getCurrentUser();
+      if (savedUser) return savedUser;
     } catch (e) {
       // ignore
     }
@@ -61,6 +58,17 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<FirestoreSyncStatus>(dataStorage.getSyncStatus());
+
+  // Keep currentUser synced if user profile/class assignments are updated in db
+  useEffect(() => {
+    if (currentUser) {
+      const freshUser = (db.users || []).find((u) => u.id === currentUser.id);
+      if (freshUser && JSON.stringify(freshUser) !== JSON.stringify(currentUser)) {
+        setCurrentUser(freshUser);
+        dataStorage.setCurrentUser(freshUser);
+      }
+    }
+  }, [db.users]);
 
   // Subscribe to local storage changes and Firestore sync status
   useEffect(() => {
@@ -195,6 +203,7 @@ export default function App() {
           return (
             <GuruDataMurid
               db={db}
+              currentUser={currentUser}
               onNavigatePraktik={(muridId) => {
                 handleNavigate('praktik', muridId);
               }}

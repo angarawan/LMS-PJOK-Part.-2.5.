@@ -12,6 +12,8 @@ export interface User {
   // Guru specific
   nip?: string;
   mataPelajaran?: string;
+  kelasDiampuIds?: string[];
+  kelasDiampu?: string[];
   // Murid specific
   nis?: string;
   nisn?: string;
@@ -423,3 +425,38 @@ export interface DiagnosticTestResult {
   details?: string;
   fixAction?: string;
 }
+
+/**
+ * Helper to get the list of classes assigned to a specific teacher
+ */
+export function getTeacherAssignedClasses(teacher: User | null | undefined, allKelas: Kelas[]): Kelas[] {
+  if (!teacher || !allKelas || allKelas.length === 0) return [];
+  if (teacher.role !== 'GURU') return allKelas;
+
+  // 1. Check if teacher has explicit kelasDiampuIds
+  if (Array.isArray(teacher.kelasDiampuIds) && teacher.kelasDiampuIds.length > 0) {
+    const matched = allKelas.filter((k) => teacher.kelasDiampuIds!.includes(k.id));
+    if (matched.length > 0) return matched;
+  }
+
+  // 2. Check if teacher has explicit kelasDiampu names (e.g. ['XI 1', 'XI 2'])
+  if (Array.isArray(teacher.kelasDiampu) && teacher.kelasDiampu.length > 0) {
+    const matched = allKelas.filter((k) =>
+      teacher.kelasDiampu!.some((nama) => nama.toLowerCase().trim() === k.nama.toLowerCase().trim())
+    );
+    if (matched.length > 0) return matched;
+  }
+
+  // 3. Check Kelas properties (guruPengampuId or guruPengampuNama)
+  const byPengampu = allKelas.filter((k) => {
+    if (k.guruPengampuId && k.guruPengampuId === teacher.id) return true;
+    if (k.guruPengampuNama && teacher.name && k.guruPengampuNama.toLowerCase().trim() === teacher.name.toLowerCase().trim()) return true;
+    return false;
+  });
+
+  if (byPengampu.length > 0) return byPengampu;
+
+  // 4. Fallback: if no specific class is assigned yet, return all classes so teacher can still operate
+  return allKelas;
+}
+

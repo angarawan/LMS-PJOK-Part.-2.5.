@@ -21,7 +21,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import { User, UserRole } from '../../types';
+import { User, UserRole, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { GoogleSheetsSyncModal } from '../GoogleSheetsSyncModal';
 
@@ -148,6 +148,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
       kelasId: 'cls-xi-1',
       jenisKelamin: 'L',
       tahunPelajaran: '2026/2027',
+      kelasDiampuIds: [],
+      kelasDiampu: [],
     });
     setEditingUser(null);
     setIsAddModalOpen(true);
@@ -155,7 +157,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
 
   const handleOpenEdit = (user: User) => {
     setEditingUser(user);
-    setFormData(user);
+    const assigned = getTeacherAssignedClasses(user, db.kelas);
+    setFormData({
+      ...user,
+      kelasDiampuIds: user.kelasDiampuIds || assigned.map((k) => k.id),
+      kelasDiampu: user.kelasDiampu || assigned.map((k) => k.nama),
+    });
     setIsAddModalOpen(true);
   };
 
@@ -163,18 +170,50 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
     e.preventDefault();
     if (!formData.name || !formData.username) return;
 
+    const teacherKelasIds = formData.kelasDiampuIds || [];
+    const teacherKelasNames = db.kelas
+      .filter((k) => teacherKelasIds.includes(k.id))
+      .map((k) => k.nama);
+
+    const targetUserId = editingUser ? editingUser.id : `usr-${activeTab.toLowerCase()}-${Date.now()}`;
+    const targetUserName = formData.name;
+
     if (editingUser) {
       // Update existing
-      dataStorage.updateDatabase((prev) => ({
-        ...prev,
-        users: prev.users.map((u) =>
-          u.id === editingUser.id ? ({ ...u, ...formData } as User) : u
-        ),
-      }));
+      dataStorage.updateDatabase((prev) => {
+        const updatedUsers = prev.users.map((u) =>
+          u.id === editingUser.id
+            ? ({
+                ...u,
+                ...formData,
+                kelasDiampuIds: activeTab === 'GURU' ? teacherKelasIds : u.kelasDiampuIds,
+                kelasDiampu: activeTab === 'GURU' ? teacherKelasNames : u.kelasDiampu,
+              } as User)
+            : u
+        );
+
+        // Synchronize with Kelas guruPengampu
+        const updatedKelas = (prev.kelas || []).map((k) => {
+          if (activeTab === 'GURU') {
+            if (teacherKelasIds.includes(k.id)) {
+              return { ...k, guruPengampuId: targetUserId, guruPengampuNama: targetUserName };
+            } else if (k.guruPengampuId === targetUserId) {
+              return { ...k, guruPengampuId: '', guruPengampuNama: '' };
+            }
+          }
+          return k;
+        });
+
+        return {
+          ...prev,
+          users: updatedUsers,
+          kelas: updatedKelas,
+        };
+      });
     } else {
       // Add new
       const newUser: User = {
-        id: `usr-${activeTab.toLowerCase()}-${Date.now()}`,
+        id: targetUserId,
         name: formData.name || '',
         username: formData.username || '',
         role: activeTab,
@@ -191,12 +230,24 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
         kelasId: formData.kelasId,
         jenisKelamin: formData.jenisKelamin,
         tahunPelajaran: formData.tahunPelajaran,
+        kelasDiampuIds: activeTab === 'GURU' ? teacherKelasIds : undefined,
+        kelasDiampu: activeTab === 'GURU' ? teacherKelasNames : undefined,
       };
 
-      dataStorage.updateDatabase((prev) => ({
-        ...prev,
-        users: [newUser, ...prev.users],
-      }));
+      dataStorage.updateDatabase((prev) => {
+        const updatedKelas = (prev.kelas || []).map((k) => {
+          if (activeTab === 'GURU' && teacherKelasIds.includes(k.id)) {
+            return { ...k, guruPengampuId: newUser.id, guruPengampuNama: newUser.name };
+          }
+          return k;
+        });
+
+        return {
+          ...prev,
+          users: [newUser, ...prev.users],
+          kelas: updatedKelas,
+        };
+      });
     }
 
     setIsAddModalOpen(false);
@@ -418,6 +469,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
                   <>
                     <th className="py-3 px-4">NIP</th>
                     <th className="py-3 px-4">Mata Pelajaran</th>
+                    <th className="py-3 px-4">Kelas Diampu</th>
                   </>
                 )}
                 <th className="py-3 px-4">Username</th>
@@ -429,7 +481,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={activeTab === 'MURID' ? 8 : 6}
+                    colSpan={activeTab === 'MURID' ? 8 : activeTab === 'GURU' ? 7 : 5}
                     className="text-center py-8 text-slate-400"
                   >
                     Tidak ada data pengguna ditemukan.
@@ -486,6 +538,26 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
                         </td>
                         <td className="py-3 px-4 font-semibold text-slate-800">
                           {u.mataPelajaran || 'PJOK'}
+                        </td>
+                        <td className="py-3 px-4">
+                          {(() => {
+                            const assigned = getTeacherAssignedClasses(u, db.kelas);
+                            if (assigned.length === 0) {
+                              return <span className="text-[10px] text-slate-400 italic">Belum ditentukan</span>;
+                            }
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {assigned.map((k) => (
+                                  <span
+                                    key={k.id}
+                                    className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold"
+                                  >
+                                    {k.nama}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                       </>
                     )}
@@ -675,30 +747,82 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
               )}
 
               {activeTab === 'GURU' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      NIP Guru
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nip || ''}
-                      onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-                      placeholder="19850314 201001 1 018"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
-                    />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        NIP Guru
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.nip || ''}
+                        onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
+                        placeholder="19850314 201001 1 018"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Mata Pelajaran
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.mataPelajaran || ''}
+                        onChange={(e) => setFormData({ ...formData, mataPelajaran: e.target.value })}
+                        placeholder="PJOK Fase F"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Mata Pelajaran
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-xs">
+                      Alokasi Kelas yang Diampu (PJOK):
                     </label>
-                    <input
-                      type="text"
-                      value={formData.mataPelajaran || ''}
-                      onChange={(e) => setFormData({ ...formData, mataPelajaran: e.target.value })}
-                      placeholder="PJOK Fase F"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                    />
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {db.kelas.map((k) => {
+                          const isChecked = (formData.kelasDiampuIds || []).includes(k.id);
+                          return (
+                            <label
+                              key={k.id}
+                              className={`flex items-center gap-2 p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                                isChecked
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900 shadow-xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const currentIds = formData.kelasDiampuIds || [];
+                                  const currentNames = formData.kelasDiampu || [];
+                                  if (e.target.checked) {
+                                    setFormData({
+                                      ...formData,
+                                      kelasDiampuIds: [...currentIds, k.id],
+                                      kelasDiampu: [...currentNames, k.nama],
+                                    });
+                                  } else {
+                                    setFormData({
+                                      ...formData,
+                                      kelasDiampuIds: currentIds.filter((id) => id !== k.id),
+                                      kelasDiampu: currentNames.filter((nama) => nama !== k.nama),
+                                    });
+                                  }
+                                }}
+                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{k.nama}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Guru ini akan secara otomatis hanya mengelola presensi, data murid, nilai, materi, dan tugas untuk kelas yang dicentang di atas.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

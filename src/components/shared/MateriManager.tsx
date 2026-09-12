@@ -273,6 +273,13 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
         materi: [newM, ...prev.materi],
       }));
     }
+
+    if (db.settings?.spreadsheetWebhookUrl) {
+      dataStorage.syncMateriToLinkedSpreadsheet().catch((err) => {
+        console.warn('Background sync materi to spreadsheet error:', err);
+      });
+    }
+
     setSyncToast({
       type: 'success',
       text: db.settings?.spreadsheetWebhookUrl

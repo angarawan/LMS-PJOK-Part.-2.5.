@@ -29,7 +29,7 @@ import {
   ArrowUpFromLine,
   ArrowDownToLine,
 } from 'lucide-react';
-import { PenilaianPraktik, RubrikPraktik, User, IndikatorPraktik } from '../../types';
+import { PenilaianPraktik, RubrikPraktik, User, IndikatorPraktik, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import {
   IndikatorTemplate,
@@ -58,9 +58,16 @@ const DEFAULT_MATERI_LIST = [
 ];
 
 export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, currentUser }) => {
-  const [selectedKelasId, setSelectedKelasId] = useState<string>(
-    db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1'
-  );
+  const assignedClasses = useMemo(() => {
+    return getTeacherAssignedClasses(currentUser, db.kelas);
+  }, [currentUser, db.kelas]);
+
+  const [selectedKelasId, setSelectedKelasId] = useState<string>(() => {
+    if (assignedClasses.length > 0) {
+      return assignedClasses[0].id;
+    }
+    return db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1';
+  });
   const [selectedMateriJudul, setSelectedMateriJudul] = useState<string>(
     'Permainan Bola Voli - Passing Bawah & Atas'
   );
@@ -740,11 +747,14 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
               }}
               className="w-full bg-slate-900/90 border border-teal-500/30 text-white rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-teal-400 cursor-pointer"
             >
-              {db.kelas.map((k) => (
-                <option key={k.id} value={k.id} className="bg-slate-900 text-white">
-                  Kelas {k.nama} ({k.jurusan || 'PJOK'})
-                </option>
-              ))}
+              {db.kelas.map((k) => {
+                const isAssigned = assignedClasses.some((a) => a.id === k.id);
+                return (
+                  <option key={k.id} value={k.id} className="bg-slate-900 text-white font-medium">
+                    {isAssigned ? '★ ' : ''}Kelas {k.nama} {isAssigned ? '(Kelas Anda)' : `(${k.jurusan || 'PJOK'})`}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

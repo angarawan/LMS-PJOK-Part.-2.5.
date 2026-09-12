@@ -24,7 +24,7 @@ import {
   WrapText,
   SlidersHorizontal,
 } from 'lucide-react';
-import { PresensiRecord, StatusPresensi, User, UserRole } from '../../types';
+import { PresensiRecord, StatusPresensi, User, UserRole, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { RekapPresensiTable } from './RekapPresensiTable';
 
@@ -113,9 +113,19 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
   currentUser,
   initialTab = 'harian',
 }) => {
-  const [selectedKelasId, setSelectedKelasId] = useState<string>(
-    db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1'
-  );
+  const assignedClasses = useMemo(() => {
+    if (role === 'GURU') {
+      return getTeacherAssignedClasses(currentUser, db.kelas);
+    }
+    return db.kelas;
+  }, [role, currentUser, db.kelas]);
+
+  const [selectedKelasId, setSelectedKelasId] = useState<string>(() => {
+    if (role === 'GURU' && assignedClasses.length > 0) {
+      return assignedClasses[0].id;
+    }
+    return db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1';
+  });
   const [selectedTanggal, setSelectedTanggal] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );

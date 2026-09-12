@@ -181,12 +181,99 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-slate-800 text-center space-y-1.5">
-            <p className="text-[11px] text-slate-400">
-              Gunakan akun terdaftar Anda untuk mengakses portal LMS PJOK.
+          {/* Quick Login Profiles for Testing Multi-Teacher & Roles */}
+          <div className="mt-5 pt-4 border-t border-slate-800">
+            <p className="text-[11px] font-semibold text-slate-400 mb-2.5 text-center flex items-center justify-center gap-1.5">
+              <span>Masuk Cepat Uji Coba Multi-Guru & Peran:</span>
             </p>
+            <div className="space-y-1.5">
+              {/* Guru 1 */}
+              {(() => {
+                const g1 = (db.users || []).find((u) => u.username === 'guru') || (db.users || []).find((u) => u.role === 'GURU');
+                if (!g1) return null;
+                return (
+                  <button
+                    key="quick-g1"
+                    type="button"
+                    onClick={() => handleSelect(g1)}
+                    className="w-full px-3 py-2 bg-slate-950/70 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 rounded-xl flex items-center justify-between text-left transition-all group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-white group-hover:text-emerald-300 truncate">
+                          {g1.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Guru PJOK • Mengampu Kelas XI 1, XI 2
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded-md shrink-0">
+                      Guru 1
+                    </span>
+                  </button>
+                );
+              })()}
+
+              {/* Guru 2 */}
+              {(() => {
+                const g2 = (db.users || []).find((u) => u.username === 'ratna');
+                if (!g2) return null;
+                return (
+                  <button
+                    key="quick-g2"
+                    type="button"
+                    onClick={() => handleSelect(g2)}
+                    className="w-full px-3 py-2 bg-slate-950/70 hover:bg-slate-800 border border-slate-800 hover:border-teal-500/50 rounded-xl flex items-center justify-between text-left transition-all group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0"></span>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-white group-hover:text-teal-300 truncate">
+                          {g2.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Guru PJOK • Mengampu Kelas XI 3, XI 5
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold bg-teal-950 text-teal-300 border border-teal-800 px-2 py-0.5 rounded-md shrink-0">
+                      Guru 2
+                    </span>
+                  </button>
+                );
+              })()}
+
+              {/* Admin */}
+              {(() => {
+                const adm = (db.users || []).find((u) => u.role === 'ADMIN');
+                if (!adm) return null;
+                return (
+                  <button
+                    key="quick-adm"
+                    type="button"
+                    onClick={() => handleSelect(adm)}
+                    className="w-full px-3 py-1.5 bg-slate-950/40 hover:bg-slate-800 border border-slate-800/80 hover:border-purple-500/50 rounded-xl flex items-center justify-between text-left transition-all group"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0"></span>
+                      <span className="text-xs font-medium text-slate-300 group-hover:text-purple-300 truncate">
+                        Admin PJOK SMANSAKA
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800 px-1.5 py-0.5 rounded shrink-0">
+                      Admin
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-800/80 text-center space-y-1">
             <p className="text-[10px] font-bold text-blue-400/90 tracking-widest uppercase">
-              VERSI 2.4.0 - 2026 PJOK SMANSAKA
+              PORTAL LMS PJOK SMANSAKA 2026
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   GraduationCap,
   Search,
@@ -10,39 +10,61 @@ import {
   Activity,
   CheckCircle2,
   Upload,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
-import { User as UserType } from '../../types';
+import { User as UserType, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { UploadDataModal } from '../shared/UploadDataModal';
 
 interface GuruDataMuridProps {
   db: LMSDatabase;
+  currentUser?: UserType;
   onNavigatePraktik: (muridId: string) => void;
 }
 
-export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, onNavigatePraktik }) => {
-  const [selectedKelasId, setSelectedKelasId] = useState<string>('cls-xi-1');
+export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, onNavigatePraktik }) => {
+  const assignedClasses = useMemo(() => {
+    return getTeacherAssignedClasses(currentUser, db.kelas);
+  }, [currentUser, db.kelas]);
+
+  const [showAllClasses, setShowAllClasses] = useState<boolean>(false);
+
+  const visibleClasses = useMemo(() => {
+    if (showAllClasses || assignedClasses.length === 0) return db.kelas;
+    return assignedClasses;
+  }, [showAllClasses, assignedClasses, db.kelas]);
+
+  const [selectedKelasId, setSelectedKelasId] = useState<string>(() => {
+    return assignedClasses.length > 0 ? assignedClasses[0].id : (db.kelas[0]?.id || 'cls-xi-1');
+  });
+
+  // Keep selectedKelasId valid if visible classes change
+  React.useEffect(() => {
+    if (visibleClasses.length > 0 && !visibleClasses.some((k) => k.id === selectedKelasId)) {
+      setSelectedKelasId(visibleClasses[0].id);
+    }
+  }, [visibleClasses, selectedKelasId]);
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeMuridDetail, setActiveMuridDetail] = useState<UserType | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
 
-  const handleImportMurid = (importedUsers: UserType[]) => {
-    dataStorage.updateDatabase((prev) => ({
-      ...prev,
-      users: [...prev.users, ...importedUsers],
-    }));
-    alert(`Berhasil menambahkan ${importedUsers.length} data murid baru ke database!`);
-  };
+  const selectedKelasObj = (db.kelas || []).find((k) => k.id === selectedKelasId);
 
-  const muridInKelas = db.users.filter((u) => u.role === 'MURID' && u.kelasId === selectedKelasId);
+  const muridInKelas = db.users.filter((u) => {
+    if (u.role !== 'MURID') return false;
+    const uKelas = (u.kelasId || '').toLowerCase().trim();
+    const selId = (selectedKelasId || '').toLowerCase().trim();
+    const selNama = (selectedKelasObj?.nama || '').toLowerCase().trim();
+    return uKelas === selId || (selNama && uKelas === selNama);
+  });
 
   const filteredMurid = muridInKelas.filter(
     (m) =>
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.nis && m.nis.includes(searchQuery))
   );
-
-  const selectedKelasObj = (db.kelas || []).find((k) => k.id === selectedKelasId);
 
   // Student details data
   const getMuridScore = (muridId: string) => {
@@ -61,34 +83,84 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, onNavigatePrak
     };
   };
 
+  const handleImportMurid = (imported: any[]) => {
+    if (!imported || imported.length === 0) return;
+    const targetKelasId = selectedKelasId || 'cls-xi-1';
+    const newUsers: UserType[] = imported.map((row, idx) => ({
+      id: row.id || `usr-imp-${Date.now()}-${idx}`,
+      username: row.username || (row.nis ? `siswa_${row.nis}` : `siswa_${Date.now()}_${idx}`),
+      name: row.name || row.nama || `Siswa Baru ${idx + 1}`,
+      role: 'MURID',
+      nis: row.nis || '',
+      nisn: row.nisn || '',
+      kelasId: row.kelasId || targetKelasId,
+      jenisKelamin: (row.jenisKelamin || 'L').toUpperCase().startsWith('P') ? 'P' : 'L',
+      status: 'Aktif',
+      tahunPelajaran: db.settings?.tahunPelajaran || '2026/2027',
+    }));
+
+    dataStorage.updateDatabase((prev) => ({
+      ...prev,
+      users: [...prev.users, ...newUsers],
+    }));
+    setIsUploadModalOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight">
-            Data Murid PJOK Fase F
-          </h2>
-          <p className="text-xs text-slate-500">
-            Daftar lengkap siswa per rombel kelas XI 1 sampai XI 7, riwayat capaian nilai, dan statistik presensi
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">
+              Data Murid PJOK Fase F
+            </h2>
+            {assignedClasses.length > 0 && (
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {assignedClasses.length} Kelas Diampu
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {currentUser?.name ? `Guru Pengampu: ${currentUser.name} • ` : ''}
+            Daftar lengkap siswa, riwayat capaian nilai praktik, dan statistik presensi
           </p>
         </div>
 
-        {/* Class switcher buttons pill */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
-          {db.kelas.map((k) => (
+        {/* Class switcher buttons and scope toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80">
+            {visibleClasses.map((k) => {
+              const isAssigned = assignedClasses.some((a) => a.id === k.id);
+              const isSelected = selectedKelasId === k.id;
+              return (
+                <button
+                  key={k.id}
+                  onClick={() => setSelectedKelasId(k.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  <span>{k.nama}</span>
+                  {isAssigned && !isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {assignedClasses.length > 0 && assignedClasses.length < db.kelas.length && (
             <button
-              key={k.id}
-              onClick={() => setSelectedKelasId(k.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                selectedKelasId === k.id
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+              type="button"
+              onClick={() => setShowAllClasses(!showAllClasses)}
+              className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors shrink-0"
             >
-              {k.nama}
+              {showAllClasses ? 'Hanya Kelas Diampu' : 'Lihat Semua Rombel'}
             </button>
-          ))}
+          )}
         </div>
       </div>
 

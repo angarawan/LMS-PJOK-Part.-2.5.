@@ -257,7 +257,7 @@ export const INITIAL_DATABASE: LMSDatabase = {
       tingkat: 'XI',
       waliKelasId: 'usr-guru-2',
       waliKelasNama: 'Ratna Sartika, S.Pd.',
-      guruPengampuId: 'usr-guru-1',
+      guruPengampuId: 'usr-guru-3',
       guruPengampuNama: 'Haryono, S.Pd.Jas',
       tahunPelajaran: '2026/2027',
       totalMurid: 34,
@@ -279,7 +279,7 @@ export const INITIAL_DATABASE: LMSDatabase = {
       tingkat: 'XI',
       waliKelasId: 'usr-guru-1',
       waliKelasNama: 'Haryono, S.Pd.Jas',
-      guruPengampuId: 'usr-guru-1',
+      guruPengampuId: 'usr-guru-3',
       guruPengampuNama: 'Haryono, S.Pd.Jas',
       tahunPelajaran: '2026/2027',
       totalMurid: 30,
@@ -1612,6 +1612,23 @@ class DataStorageService {
         const rawName = u.name || u.nama || u.Nama || u.NAMA || u.namalengkap || u.nama_lengkap || `Pengguna ${idx + 1}`;
         const rawUsername = u.username || u.Username || u.nis || u.nip || rawName.toLowerCase().replace(/\s+/g, '') || `user${idx + 1}`;
 
+        // Parse kelas diampu for teachers
+        const rawDiampu = u.kelasDiampu || u.kelas_diampu || u.diampu || '';
+        let parsedKelasDiampu: string[] | undefined = undefined;
+        let parsedKelasDiampuIds: string[] | undefined = undefined;
+        if (role === 'GURU' && rawDiampu) {
+          const list = Array.isArray(rawDiampu)
+            ? rawDiampu.map(String)
+            : String(rawDiampu).split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+          parsedKelasDiampu = list;
+          parsedKelasDiampuIds = list.map((nama) => {
+            const found = this.db.kelas.find(
+              (k) => k.nama.toLowerCase() === nama.toLowerCase() || k.id.toLowerCase() === nama.toLowerCase()
+            );
+            return found ? found.id : nama;
+          });
+        }
+
         return {
           id: u.id || u.ID || `usr-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`,
           username: rawUsername,
@@ -1624,6 +1641,8 @@ class DataStorageService {
           nip: u.nip || u.NIP || (role === 'GURU' ? u.nis : '') || '',
           avatar: u.avatar || u.foto || '',
           kelasId: u.kelasId || u.kelas || u.rombel || 'cls-xi-1',
+          kelasDiampu: parsedKelasDiampu,
+          kelasDiampuIds: parsedKelasDiampuIds,
           tahunPelajaran: u.tahunPelajaran || u.tahun_ajaran || '2026/2027',
           jenisKelamin: (u.jenisKelamin || u.gender || 'L').toUpperCase().startsWith('P') ? 'P' : 'L',
         };
@@ -1849,6 +1868,10 @@ class DataStorageService {
         nis: u.nis || '',
         email: u.email || '',
         status: u.status || 'Aktif',
+        kelasDiampu: u.kelasDiampu ? u.kelasDiampu.join(', ') : '',
+        kelasId: u.kelasId || '',
+        jenisKelamin: u.jenisKelamin || '',
+        tahunPelajaran: u.tahunPelajaran || '2026/2027',
       })),
       ADMIN: this.db.users.filter((u) => u.role === 'ADMIN').map((u) => ({
         id: u.id,
@@ -1864,15 +1887,22 @@ class DataStorageService {
         nip: u.nip || '',
         mataPelajaran: u.mataPelajaran || 'PJOK',
         email: u.email || '',
+        kelasDiampu: u.kelasDiampu ? u.kelasDiampu.join(', ') : '',
+        status: u.status || 'Aktif',
       })),
-      MURID: this.db.users.filter((u) => u.role === 'MURID').map((u) => ({
-        id: u.id,
-        nis: u.nis || '',
-        nisn: u.nisn || '',
-        name: u.name,
-        kelasId: u.kelasId || 'cls-xi-1',
-        jenisKelamin: u.jenisKelamin || 'L',
-      })),
+      MURID: this.db.users.filter((u) => u.role === 'MURID').map((u) => {
+        const kObj = this.db.kelas.find((k) => k.id === u.kelasId);
+        return {
+          id: u.id,
+          nis: u.nis || '',
+          nisn: u.nisn || '',
+          name: u.name,
+          kelasId: u.kelasId || 'cls-xi-1',
+          kelasNama: kObj?.nama || u.kelasId || 'XI 1',
+          jenisKelamin: u.jenisKelamin || 'L',
+          status: u.status || 'Aktif',
+        };
+      }),
       KELAS: this.db.kelas,
       MATERI: this.db.materi.map((m) => ({
         id: m.id,

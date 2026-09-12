@@ -43,6 +43,16 @@ export const RAW_USERS_CSV_DATA: StudentCSVRecord[] = [
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
   },
   {
+    id: 'usr-guru-3',
+    username: 'haryono',
+    role: 'GURU',
+    name: 'Haryono, S.Pd.Jas',
+    nip: '19820512 200801 1 015',
+    email: 'haryono.pjok@sman1olahraga.sch.id',
+    status: 'Aktif',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=120&auto=format&fit=crop&q=80',
+  },
+  {
     id: 'usr-murid-1',
     username: 'usr-murid-1',
     role: 'murid1',
@@ -372,12 +382,38 @@ export const DEFAULT_USERS: User[] = RAW_USERS_CSV_DATA.map((r) => {
   if (isAdmin || isGuru) {
     user.nip = r.nip;
     if (isGuru) {
-      user.mataPelajaran = r.username === 'ratna' ? 'PJOK Putri & Senam' : 'PJOK Fase E & F';
+      if (r.username === 'ratna') {
+        user.mataPelajaran = 'PJOK Putri & Senam';
+        user.kelasDiampuIds = ['cls-xi-3', 'cls-xi-5'];
+        user.kelasDiampu = ['XI 3', 'XI 5'];
+      } else if (r.username === 'haryono') {
+        user.mataPelajaran = 'PJOK Atletik & Bela Diri';
+        user.kelasDiampuIds = ['cls-xi-4', 'cls-xi-6'];
+        user.kelasDiampu = ['XI 4', 'XI 6'];
+      } else {
+        user.mataPelajaran = 'PJOK Permainan Bola & Kebugaran';
+        user.kelasDiampuIds = ['cls-xi-1', 'cls-xi-2'];
+        user.kelasDiampu = ['XI 1', 'XI 2'];
+      }
     }
   } else {
     user.nis = r.nip;
     user.nip = r.nip; // preserve nip column compatibility
-    user.kelasId = 'cls-xi-1';
+    
+    // Distribute students across classes so every teacher has students in their classes
+    const studentIdx = parseInt(r.username.replace('usr-murid-', ''), 10) || 1;
+    if (studentIdx <= 10) {
+      user.kelasId = 'cls-xi-1';
+    } else if (studentIdx <= 18) {
+      user.kelasId = 'cls-xi-2';
+    } else if (studentIdx <= 24) {
+      user.kelasId = 'cls-xi-3';
+    } else if (studentIdx <= 28) {
+      user.kelasId = 'cls-xi-4';
+    } else {
+      user.kelasId = 'cls-xi-5';
+    }
+    
     user.tahunPelajaran = '2026/2027';
     // Gender detection
     const lower = r.name.toLowerCase();
