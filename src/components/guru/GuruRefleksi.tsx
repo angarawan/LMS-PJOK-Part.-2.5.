@@ -28,6 +28,7 @@ import {
   RefleksiPembelajaran,
   SoalRefleksi,
   User,
+  getTeacherAssignedClasses,
 } from '../../types';
 
 interface GuruRefleksiProps {
@@ -36,6 +37,14 @@ interface GuruRefleksiProps {
 }
 
 export const GuruRefleksi: React.FC<GuruRefleksiProps> = ({ db, currentUser }) => {
+  const availableClasses = useMemo(() => {
+    if (currentUser?.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
   const [activeTab, setActiveTab] = useState<'daftar' | 'respon'>('daftar');
   const [selectedKelasId, setSelectedKelasId] = useState<string>('ALL');
   const [filterPublikasi, setFilterPublikasi] = useState<'Semua' | 'Publish' | 'Draft'>('Semua');
@@ -371,11 +380,11 @@ export const GuruRefleksi: React.FC<GuruRefleksiProps> = ({ db, currentUser }) =
                 className="text-xs font-bold bg-white/10 border border-white/20 text-white rounded-xl px-3 py-1.5 focus:outline-hidden focus:bg-slate-900 cursor-pointer"
               >
                 <option value="ALL" className="bg-slate-900 text-white">
-                  Semua Kelas
+                  {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas'}
                 </option>
-                {db.kelas.map((k) => (
+                {availableClasses.map((k) => (
                   <option key={k.id} value={k.id} className="bg-slate-900 text-white">
-                    Kelas {k.nama}
+                    Kelas {k.nama} (Tingkat {k.tingkat})
                   </option>
                 ))}
               </select>
@@ -801,10 +810,12 @@ export const GuruRefleksi: React.FC<GuruRefleksiProps> = ({ db, currentUser }) =
                     onChange={(e) => setFormKelasId(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="ALL">Semua Kelas (Umum)</option>
-                    {db.kelas.map((k) => (
+                    <option value="ALL">
+                      {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas (Umum)'}
+                    </option>
+                    {availableClasses.map((k) => (
                       <option key={k.id} value={k.id}>
-                        Kelas {k.nama}
+                        Kelas {k.nama} (Tingkat {k.tingkat})
                       </option>
                     ))}
                   </select>

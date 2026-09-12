@@ -23,7 +23,7 @@ import {
   ArrowUpFromLine,
   ArrowDownToLine,
 } from 'lucide-react';
-import { Materi, User } from '../../types';
+import { Materi, User, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { InAppMediaModal, parseMediaUrl } from './InAppMediaModal';
 import { UploadDataModal } from './UploadDataModal';
@@ -39,6 +39,14 @@ interface MateriManagerProps {
 }
 
 export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser }) => {
+  const availableClasses = React.useMemo(() => {
+    if (currentUser?.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
   const [selectedKategori, setSelectedKategori] = useState<string>('Semua');
   const [selectedKelasId, setSelectedKelasId] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -68,7 +76,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
     tujuanPembelajaran: '',
     deskripsi: '',
     materiInti: '',
-    kelasIds: db.kelas.map((k) => k.id),
+    kelasIds: availableClasses.map((k) => k.id),
     videoUrl: '',
     fileUrl: '',
     status: 'Publish',
@@ -155,6 +163,14 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
       m.kelasIds.length === 0 ||
       m.kelasIds.includes(selectedKelasId);
 
+    // If teacher, only show materials relevant to their assigned classes or general materials
+    if (currentUser?.role === 'GURU') {
+      const teacherClassIds = availableClasses.map((k) => k.id);
+      const isGeneral = !m.kelasIds || m.kelasIds.length === 0;
+      const matchesTeacherClass = m.kelasIds && m.kelasIds.some((cId) => teacherClassIds.includes(cId));
+      if (!isGeneral && !matchesTeacherClass) return false;
+    }
+
     return matchCat && matchQuery && matchKelas;
   });
 
@@ -198,7 +214,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
       deskripsi: '',
       materiInti: '',
       kolomKustom: [],
-      kelasIds: db.kelas.map((k) => k.id),
+      kelasIds: availableClasses.map((k) => k.id),
       videoUrl: '',
       fileUrl: '',
       status: 'Publish',
@@ -215,7 +231,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
       tujuanPembelajaran: m.tujuanPembelajaran || '',
       deskripsi: m.deskripsi || '',
       materiInti: m.materiInti || m.kontenTeks || m.konten || '',
-      kelasIds: m.kelasIds || (m.kelasId ? [m.kelasId] : db.kelas.map((k) => k.id)),
+      kelasIds: m.kelasIds || (m.kelasId ? [m.kelasId] : availableClasses.map((k) => k.id)),
     });
     setIsModalOpen(true);
   };
@@ -260,7 +276,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
         materiInti: materiIntiText,
         kontenTeks: materiIntiText,
         kolomKustom: cleanKolomKustom,
-        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : db.kelas.map((k) => k.id),
+        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : availableClasses.map((k) => k.id),
         status: form.status || 'Publish',
         videoUrl: form.videoUrl || '',
         fileUrl: form.fileUrl || '',
@@ -419,10 +435,12 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
               onChange={(e) => setSelectedKelasId(e.target.value)}
               className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden font-semibold text-slate-700 flex-1 md:flex-initial"
             >
-              <option value="Semua">Semua Kelas</option>
-              {db.kelas.map((k) => (
+              <option value="Semua">
+                {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas'}
+              </option>
+              {availableClasses.map((k) => (
                 <option key={k.id} value={k.id}>
-                  {k.nama}
+                  Kelas {k.nama} (Tingkat {k.tingkat})
                 </option>
               ))}
             </select>
@@ -886,7 +904,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
               <div>
                 <label className="block font-bold text-slate-700 mb-1.5">Target Kelas / Rombel</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 max-h-28 overflow-y-auto">
-                  {db.kelas.map((k) => {
+                  {availableClasses.map((k) => {
                     const isChecked = form.kelasIds?.includes(k.id) ?? false;
                     return (
                       <label key={k.id} className="flex items-center gap-1.5 cursor-pointer text-[11px]">
@@ -903,7 +921,7 @@ export const MateriManager: React.FC<MateriManagerProps> = ({ db, currentUser })
                           }}
                           className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                         />
-                        <span className="font-semibold text-slate-700">{k.nama}</span>
+                        <span className="font-semibold text-slate-700">Kelas {k.nama}</span>
                       </label>
                     );
                   })}

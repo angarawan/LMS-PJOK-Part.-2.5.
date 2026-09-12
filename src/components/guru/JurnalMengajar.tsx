@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { FileText, Plus, Calendar, Clock, School, Save, Trash2, Edit2, X } from 'lucide-react';
-import { JurnalMengajar, User } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { FileText, Plus, Calendar, Clock, School, Save, Trash2, Edit2, X, Filter } from 'lucide-react';
+import { JurnalMengajar, User, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 
 interface JurnalMengajarProps {
@@ -9,13 +9,22 @@ interface JurnalMengajarProps {
 }
 
 export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentUser }) => {
+  const availableClasses = useMemo(() => {
+    if (currentUser?.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
+  const [selectedFilterKelasId, setSelectedFilterKelasId] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingJurnal, setEditingJurnal] = useState<JurnalMengajar | null>(null);
 
   const [formData, setFormData] = useState<Partial<JurnalMengajar>>({
     tanggal: new Date().toISOString().slice(0, 10),
     jamKe: '1 - 3 (07.15 - 09.30 WIB)',
-    kelasId: 'cls-xi-1',
+    kelasId: availableClasses[0]?.id || 'cls-xi-1',
     materiJudul: 'Permainan Bola Voli - Passing Bawah & Passing Atas',
     kegiatan:
       'Pemanasan dinamis, demonstrasi teknik perkenaan bola pada lengan, latihan passing berpasangan 20 kali, dan evaluasi gerak.',
@@ -30,7 +39,7 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
     setFormData({
       tanggal: new Date().toISOString().slice(0, 10),
       jamKe: '1 - 3 (07.15 - 09.30 WIB)',
-      kelasId: 'cls-xi-1',
+      kelasId: availableClasses[0]?.id || 'cls-xi-1',
       materiJudul: 'Permainan Bola Voli - Passing Bawah & Passing Atas',
       kegiatan: '',
       jumlahHadir: 32,
@@ -39,6 +48,20 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
     });
     setIsModalOpen(true);
   };
+
+  const filteredJurnal = useMemo(() => {
+    return (db.jurnal || []).filter((j) => {
+      // If teacher, only show their assigned classes
+      if (currentUser?.role === 'GURU') {
+        const isAssigned = availableClasses.some((k) => k.id === j.kelasId || k.nama === j.kelasNama);
+        if (!isAssigned) return false;
+      }
+      if (selectedFilterKelasId !== 'ALL') {
+        return j.kelasId === selectedFilterKelasId;
+      }
+      return true;
+    });
+  }, [db.jurnal, currentUser, availableClasses, selectedFilterKelasId]);
 
   const handleOpenEdit = (j: JurnalMengajar) => {
     setEditingJurnal(j);
@@ -116,14 +139,39 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
         </button>
       </div>
 
+      {/* Filter and Actions Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="text-xs font-bold text-slate-600 shrink-0">Filter Kelas:</span>
+          <select
+            value={selectedFilterKelasId}
+            onChange={(e) => setSelectedFilterKelasId(e.target.value)}
+            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="ALL">
+              {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas'}
+            </option>
+            {availableClasses.map((k) => (
+              <option key={k.id} value={k.id}>
+                Kelas {k.nama} (Tingkat {k.tingkat})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="text-xs text-slate-500 font-semibold self-end sm:self-center">
+          Menampilkan {filteredJurnal.length} Catatan Jurnal
+        </div>
+      </div>
+
       {/* Jurnal Cards List */}
       <div className="space-y-4">
-        {db.jurnal.length === 0 ? (
+        {filteredJurnal.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400">
-            Belum ada catatan jurnal mengajar. Klik tombol "Tulis Jurnal Baru" untuk menambahkan.
+            Belum ada catatan jurnal mengajar untuk kelas ini. Klik tombol "Tulis Jurnal Baru" untuk menambahkan.
           </div>
         ) : (
-          db.jurnal.map((j) => (
+          filteredJurnal.map((j) => (
             <div
               key={j.id}
               className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all space-y-3"
@@ -241,9 +289,9 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
                     onChange={(e) => setFormData({ ...formData, kelasId: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold"
                   >
-                    {db.kelas.map((k) => (
+                    {availableClasses.map((k) => (
                       <option key={k.id} value={k.id}>
-                        Kelas {k.nama}
+                        Kelas {k.nama} (Tingkat {k.tingkat})
                       </option>
                     ))}
                   </select>

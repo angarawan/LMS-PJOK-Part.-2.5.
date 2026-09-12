@@ -126,6 +126,12 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
     }
     return db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1';
   });
+
+  useEffect(() => {
+    if (assignedClasses.length > 0 && !assignedClasses.some((k) => k.id === selectedKelasId)) {
+      setSelectedKelasId(assignedClasses[0].id);
+    }
+  }, [assignedClasses, selectedKelasId]);
   const [selectedTanggal, setSelectedTanggal] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
@@ -483,9 +489,9 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
               onChange={(e) => setSelectedKelasId(e.target.value)}
               className="w-full text-xs font-bold bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 focus:outline-hidden focus:bg-slate-900 cursor-pointer"
             >
-              {db.kelas.map((k) => (
+              {assignedClasses.map((k) => (
                 <option key={k.id} value={k.id} className="bg-slate-900 text-white">
-                  Kelas {k.nama} ({k.jurusan || 'PJOK'})
+                  Kelas {k.nama} (Tingkat {k.tingkat})
                 </option>
               ))}
             </select>

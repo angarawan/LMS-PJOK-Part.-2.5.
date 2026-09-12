@@ -218,6 +218,53 @@ export const INITIAL_DATABASE: LMSDatabase = {
   },
   users: DEFAULT_USERS,
   kelas: [
+    // --- TINGKAT X (FASE E) ---
+    {
+      id: 'cls-x-1',
+      nama: 'X 1',
+      tingkat: 'X',
+      waliKelasId: 'usr-guru-2',
+      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      guruPengampuId: 'usr-guru-2',
+      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+    {
+      id: 'cls-x-2',
+      nama: 'X 2',
+      tingkat: 'X',
+      waliKelasId: 'usr-guru-2',
+      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      guruPengampuId: 'usr-guru-2',
+      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+    {
+      id: 'cls-x-3',
+      nama: 'X 3',
+      tingkat: 'X',
+      waliKelasId: 'usr-guru-2',
+      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      guruPengampuId: 'usr-guru-2',
+      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+    {
+      id: 'cls-x-4',
+      nama: 'X 4',
+      tingkat: 'X',
+      waliKelasId: 'usr-guru-2',
+      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      guruPengampuId: 'usr-guru-2',
+      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+
+    // --- TINGKAT XI (FASE F) ---
     {
       id: 'cls-xi-1',
       nama: 'XI 1',
@@ -233,8 +280,8 @@ export const INITIAL_DATABASE: LMSDatabase = {
       id: 'cls-xi-2',
       nama: 'XI 2',
       tingkat: 'XI',
-      waliKelasId: 'usr-guru-2',
-      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      waliKelasId: 'usr-guru-1',
+      waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       guruPengampuId: 'usr-guru-1',
       guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       tahunPelajaran: '2026/2027',
@@ -246,8 +293,8 @@ export const INITIAL_DATABASE: LMSDatabase = {
       tingkat: 'XI',
       waliKelasId: 'usr-guru-1',
       waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
-      guruPengampuId: 'usr-guru-2',
-      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      guruPengampuId: 'usr-guru-1',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       tahunPelajaran: '2026/2027',
       totalMurid: 33,
     },
@@ -255,10 +302,10 @@ export const INITIAL_DATABASE: LMSDatabase = {
       id: 'cls-xi-4',
       nama: 'XI 4',
       tingkat: 'XI',
-      waliKelasId: 'usr-guru-2',
-      waliKelasNama: 'Ratna Sartika, S.Pd.',
-      guruPengampuId: 'usr-guru-3',
-      guruPengampuNama: 'Haryono, S.Pd.Jas',
+      waliKelasId: 'usr-guru-1',
+      waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      guruPengampuId: 'usr-guru-1',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       tahunPelajaran: '2026/2027',
       totalMurid: 34,
     },
@@ -267,9 +314,9 @@ export const INITIAL_DATABASE: LMSDatabase = {
       nama: 'XI 5',
       tingkat: 'XI',
       waliKelasId: 'usr-guru-1',
-      waliKelasNama: 'Haryono, S.Pd.Jas',
-      guruPengampuId: 'usr-guru-2',
-      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+      waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      guruPengampuId: 'usr-guru-1',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       tahunPelajaran: '2026/2027',
       totalMurid: 32,
     },
@@ -278,9 +325,9 @@ export const INITIAL_DATABASE: LMSDatabase = {
       nama: 'XI 6',
       tingkat: 'XI',
       waliKelasId: 'usr-guru-1',
-      waliKelasNama: 'Haryono, S.Pd.Jas',
-      guruPengampuId: 'usr-guru-3',
-      guruPengampuNama: 'Haryono, S.Pd.Jas',
+      waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      guruPengampuId: 'usr-guru-1',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       tahunPelajaran: '2026/2027',
       totalMurid: 30,
     },
@@ -288,9 +335,55 @@ export const INITIAL_DATABASE: LMSDatabase = {
       id: 'cls-xi-7',
       nama: 'XI 7',
       tingkat: 'XI',
-      waliKelasId: 'usr-guru-2',
-      waliKelasNama: 'Ratna Sartika, S.Pd.',
+      waliKelasId: 'usr-guru-1',
+      waliKelasNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
       guruPengampuId: 'usr-guru-1',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 31,
+    },
+
+    // --- TINGKAT XII (FASE F) ---
+    {
+      id: 'cls-xii-1',
+      nama: 'XII 1',
+      tingkat: 'XII',
+      waliKelasId: 'usr-guru-3',
+      waliKelasNama: 'Haryono, S.Pd.Jas',
+      guruPengampuId: 'usr-guru-3',
+      guruPengampuNama: 'Haryono, S.Pd.Jas',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+    {
+      id: 'cls-xii-2',
+      nama: 'XII 2',
+      tingkat: 'XII',
+      waliKelasId: 'usr-guru-3',
+      waliKelasNama: 'Haryono, S.Pd.Jas',
+      guruPengampuId: 'usr-guru-3',
+      guruPengampuNama: 'Haryono, S.Pd.Jas',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 32,
+    },
+    {
+      id: 'cls-xii-3',
+      nama: 'XII 3',
+      tingkat: 'XII',
+      waliKelasId: 'usr-guru-3',
+      waliKelasNama: 'Haryono, S.Pd.Jas',
+      guruPengampuId: 'usr-guru-3',
+      guruPengampuNama: 'Haryono, S.Pd.Jas',
+      tahunPelajaran: '2026/2027',
+      totalMurid: 33,
+    },
+    {
+      id: 'cls-xii-4',
+      nama: 'XII 4',
+      tingkat: 'XII',
+      waliKelasId: 'usr-guru-3',
+      waliKelasNama: 'Haryono, S.Pd.Jas',
+      guruPengampuId: 'usr-guru-3',
       guruPengampuNama: 'Haryono, S.Pd.Jas',
       tahunPelajaran: '2026/2027',
       totalMurid: 31,
@@ -298,13 +391,31 @@ export const INITIAL_DATABASE: LMSDatabase = {
   ],
   mataPelajaran: [
     {
-      id: 'mp-pjok-f',
-      nama: 'PJOK',
+      id: 'mp-pjok-x',
+      nama: 'PJOK Fase E (Kelas X)',
+      fase: 'E',
+      tingkat: 'Kelas X',
+      tahunPelajaran: '2026/2027',
+      guruPengampuId: 'usr-guru-2',
+      guruPengampuNama: 'Ratna Sartika, S.Pd.',
+    },
+    {
+      id: 'mp-pjok-xi',
+      nama: 'PJOK Fase F (Kelas XI)',
       fase: 'F',
       tingkat: 'Kelas XI',
       tahunPelajaran: '2026/2027',
       guruPengampuId: 'usr-guru-1',
-      guruPengampuNama: 'Haryono, S.Pd.Jas, M.Or.',
+      guruPengampuNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+    },
+    {
+      id: 'mp-pjok-xii',
+      nama: 'PJOK Fase F (Kelas XII)',
+      fase: 'F',
+      tingkat: 'Kelas XII',
+      tahunPelajaran: '2026/2027',
+      guruPengampuId: 'usr-guru-3',
+      guruPengampuNama: 'Haryono, S.Pd.Jas',
     },
   ],
   materi: [
@@ -1051,11 +1162,38 @@ class DataStorageService {
           );
           if (!hasAccurateData || loadedUsers.length < 30) {
             loadedUsers = INITIAL_DATABASE.users;
+          } else {
+            // Ensure teachers have their classes assigned properly
+            loadedUsers = loadedUsers.map((u) => {
+              if (u.role === 'GURU') {
+                const defGuru = DEFAULT_USERS.find((d) => d.id === u.id || d.username === u.username);
+                if (defGuru) {
+                  return {
+                    ...u,
+                    mataPelajaran: u.mataPelajaran || defGuru.mataPelajaran,
+                    kelasDiampu: u.kelasDiampu && u.kelasDiampu.length > 0 ? u.kelasDiampu : defGuru.kelasDiampu,
+                    kelasDiampuIds: u.kelasDiampuIds && u.kelasDiampuIds.length > 0 ? u.kelasDiampuIds : defGuru.kelasDiampuIds,
+                  };
+                }
+              }
+              return u;
+            });
           }
         }
 
         let loadedNilai = Array.isArray(parsed?.nilai) ? parsed.nilai : [];
         let loadedPresensi = Array.isArray(parsed?.presensi) ? parsed.presensi : [];
+
+        // Ensure all grades from X to XII exist in kelas
+        let loadedKelas: Kelas[] = Array.isArray(parsed?.kelas) && parsed.kelas.length > 0 ? parsed.kelas : INITIAL_DATABASE.kelas;
+        const hasKelasX = loadedKelas.some((k) => k.tingkat === 'X');
+        const hasKelasXII = loadedKelas.some((k) => k.tingkat === 'XII');
+        if (!hasKelasX || !hasKelasXII) {
+          const missing = INITIAL_DATABASE.kelas.filter(
+            (ik) => !loadedKelas.some((lk) => lk.id === ik.id || lk.nama === ik.nama)
+          );
+          loadedKelas = [...loadedKelas, ...missing];
+        }
 
         const primaryTeacher = 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.';
 
@@ -1071,8 +1209,8 @@ class DataStorageService {
               : primaryTeacher,
           },
           users: loadedUsers,
-          kelas: Array.isArray(parsed?.kelas) ? parsed.kelas : INITIAL_DATABASE.kelas,
-          mataPelajaran: Array.isArray(parsed?.mataPelajaran) ? parsed.mataPelajaran : INITIAL_DATABASE.mataPelajaran,
+          kelas: loadedKelas,
+          mataPelajaran: Array.isArray(parsed?.mataPelajaran) && parsed.mataPelajaran.length >= 3 ? parsed.mataPelajaran : INITIAL_DATABASE.mataPelajaran,
           materi: Array.isArray(parsed?.materi)
             ? (isCleanSlate ? parsed.materi : parsed.materi.map((m: any) => ({
                 ...m,

@@ -23,7 +23,7 @@ import {
   Filter,
   Upload,
 } from 'lucide-react';
-import { Tugas, PengumpulanTugas, User } from '../../types';
+import { Tugas, PengumpulanTugas, User, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { InAppMediaModal } from './InAppMediaModal';
 import { UploadDataModal } from './UploadDataModal';
@@ -34,6 +34,14 @@ interface TugasManagerProps {
 }
 
 export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) => {
+  const availableClasses = React.useMemo(() => {
+    if (currentUser?.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
   const [selectedTab, setSelectedTab] = useState<'tugas' | 'pengumpulan'>('tugas');
   const [selectedTugasId, setSelectedTugasId] = useState<string>('Semua');
   const [selectedKelasId, setSelectedKelasId] = useState<string>('Semua');
@@ -77,7 +85,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
     kategori: 'Praktik Gerak Mandiri',
     instruksi: '',
     deadline: '2026-09-30T23:59',
-    kelasIds: db.kelas.map((k) => k.id),
+    kelasIds: availableClasses.map((k) => k.id),
     status: 'Publish',
   });
 
@@ -101,6 +109,14 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
       !t.kelasIds ||
       t.kelasIds.length === 0 ||
       t.kelasIds.includes(selectedKelasId);
+
+    // If teacher, only show tasks for their assigned classes or general
+    if (currentUser?.role === 'GURU') {
+      const teacherClassIds = availableClasses.map((k) => k.id);
+      const isGeneral = !t.kelasIds || t.kelasIds.length === 0;
+      const matchesTeacherClass = t.kelasIds && t.kelasIds.some((cId) => teacherClassIds.includes(cId));
+      if (!isGeneral && !matchesTeacherClass) return false;
+    }
 
     const isDraft = t.status === 'Draft' || t.statusPublikasi === 'Draft';
     const matchPublikasi =
@@ -138,6 +154,12 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
   ).length;
 
   const filteredSubmissions = allSubmissions.filter((p) => {
+    // If teacher, only show submissions from teacher's assigned classes
+    if (currentUser?.role === 'GURU') {
+      const teacherClassIds = availableClasses.map((k) => k.id);
+      if (p.kelasId && !teacherClassIds.includes(p.kelasId)) return false;
+    }
+
     const matchTugas = selectedTugasId === 'Semua' || p.tugasId === selectedTugasId;
     const matchKelas = selectedKelasId === 'Semua' || p.kelasId === selectedKelasId;
     const matchStatus =
@@ -160,7 +182,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
       kategori: 'Praktik Gerak Mandiri',
       instruksi: '',
       deadline: '2026-09-30T23:59',
-      kelasIds: db.kelas.map((k) => k.id),
+      kelasIds: availableClasses.map((k) => k.id),
       status: 'Publish',
     });
     setIsModalOpen(true);
@@ -170,7 +192,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
     setEditingTugas(t);
     setForm({
       ...t,
-      kelasIds: t.kelasIds || (t.kelasId ? [t.kelasId] : db.kelas.map((k) => k.id)),
+      kelasIds: t.kelasIds || (t.kelasId ? [t.kelasId] : availableClasses.map((k) => k.id)),
     });
     setIsModalOpen(true);
   };
@@ -206,7 +228,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
         kategori: form.kategori || 'Praktik Gerak Mandiri',
         instruksi: form.instruksi || '',
         deadline: form.deadline || '2026-09-30T23:59',
-        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : db.kelas.map((k) => k.id),
+        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : availableClasses.map((k) => k.id),
         status: finalStatus,
         statusPublikasi: finalStatus,
         dibuatOleh: currentUser.name,
@@ -380,10 +402,12 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
             onChange={(e) => setSelectedKelasId(e.target.value)}
             className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700"
           >
-            <option value="Semua">Semua Rombel</option>
-            {db.kelas.map((k) => (
+            <option value="Semua">
+              {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Rombel'}
+            </option>
+            {availableClasses.map((k) => (
               <option key={k.id} value={k.id}>
-                {k.nama}
+                Kelas {k.nama} (Tingkat {k.tingkat})
               </option>
             ))}
           </select>
@@ -941,7 +965,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
               <div>
                 <label className="block font-bold text-slate-700 mb-1.5">Target Kelas / Rombel</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 max-h-32 overflow-y-auto">
-                  {db.kelas.map((k) => {
+                  {availableClasses.map((k) => {
                     const isChecked = form.kelasIds?.includes(k.id) ?? false;
                     return (
                       <label key={k.id} className="flex items-center gap-1.5 cursor-pointer text-[11px]">

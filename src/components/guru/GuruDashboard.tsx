@@ -745,7 +745,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {db.kelas.slice(0, 4).map((k) => (
+            {activeClasses.slice(0, 4).map((k) => (
               <div
                 key={k.id}
                 onClick={() => onNavigate('data-murid')}

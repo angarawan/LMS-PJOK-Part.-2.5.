@@ -22,7 +22,7 @@ import {
   Upload,
   Activity,
 } from 'lucide-react';
-import { Quiz, Soal, JawabanQuiz, User } from '../../types';
+import { Quiz, Soal, JawabanQuiz, User, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { UploadDataModal } from './UploadDataModal';
 
@@ -32,6 +32,14 @@ interface QuizManagerProps {
 }
 
 export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => {
+  const availableClasses = React.useMemo(() => {
+    if (currentUser?.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
   const [selectedTab, setSelectedTab] = useState<'quiz' | 'hasil'>('quiz');
   const [selectedQuizId, setSelectedQuizId] = useState<string>('Semua');
   const [selectedKelasId, setSelectedKelasId] = useState<string>('Semua');
@@ -62,7 +70,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
         acakJawaban: true,
         tampilkanPembahasan: true,
         status: 'Publish',
-        kelasIds: db.kelas.map((k) => k.id),
+        kelasIds: availableClasses.map((k) => k.id),
         dibuatPada: new Date().toISOString().slice(0, 10),
         dibuatOleh: currentUser.name,
         guruNama: currentUser.name,
@@ -85,7 +93,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
     acakSoal: true,
     acakJawaban: true,
     tampilkanPembahasan: true,
-    kelasIds: db.kelas.map((k) => k.id),
+    kelasIds: availableClasses.map((k) => k.id),
     soal: [
       {
         id: `soal-1`,
@@ -141,6 +149,14 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
       q.kelasIds.length === 0 ||
       q.kelasIds.includes(selectedKelasId);
 
+    // If teacher, only show quizzes for their assigned classes or general
+    if (currentUser?.role === 'GURU') {
+      const teacherClassIds = availableClasses.map((k) => k.id);
+      const isGeneral = !q.kelasIds || q.kelasIds.length === 0;
+      const matchesTeacherClass = q.kelasIds && q.kelasIds.some((cId) => teacherClassIds.includes(cId));
+      if (!isGeneral && !matchesTeacherClass) return false;
+    }
+
     const isDraft = q.status === 'Draft' || q.statusPublikasi === 'Draft';
     const matchPublikasi =
       filterPublikasi === 'Semua' ||
@@ -169,6 +185,12 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
 
   // Filter student quiz attempts
   const filteredHasil = db.jawabanQuiz.filter((j) => {
+    // If teacher, only show student answers from teacher's assigned classes
+    if (currentUser?.role === 'GURU') {
+      const teacherClassIds = availableClasses.map((k) => k.id);
+      if (j.kelasId && !teacherClassIds.includes(j.kelasId)) return false;
+    }
+
     const matchQuiz = selectedQuizId === 'Semua' || j.quizId === selectedQuizId;
     const matchKelas = selectedKelasId === 'Semua' || j.kelasId === selectedKelasId;
     const matchSearch =
@@ -187,7 +209,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
       acakSoal: true,
       acakJawaban: true,
       tampilkanPembahasan: true,
-      kelasIds: db.kelas.map((k) => k.id),
+      kelasIds: availableClasses.map((k) => k.id),
       soal: [
         {
           id: `soal-${Date.now()}`,
@@ -216,7 +238,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
 
     setForm({
       ...q,
-      kelasIds: q.kelasIds || (q.kelasId ? [q.kelasId] : db.kelas.map((k) => k.id)),
+      kelasIds: q.kelasIds || (q.kelasId ? [q.kelasId] : availableClasses.map((k) => k.id)),
       soal: existingQuestions,
     });
     setIsModalOpen(true);
@@ -263,7 +285,7 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
         acakSoal: Boolean(form.acakSoal),
         acakJawaban: Boolean(form.acakJawaban),
         tampilkanPembahasan: Boolean(form.tampilkanPembahasan),
-        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : db.kelas.map((k) => k.id),
+        kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : availableClasses.map((k) => k.id),
         status: finalStatus,
         statusPublikasi: finalStatus,
         dibuatOleh: currentUser.name,
@@ -525,10 +547,12 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
             onChange={(e) => setSelectedKelasId(e.target.value)}
             className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700"
           >
-            <option value="Semua">Semua Rombel</option>
-            {db.kelas.map((k) => (
+            <option value="Semua">
+              {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Rombel'}
+            </option>
+            {availableClasses.map((k) => (
               <option key={k.id} value={k.id}>
-                {k.nama}
+                Kelas {k.nama} (Tingkat {k.tingkat})
               </option>
             ))}
           </select>
@@ -962,6 +986,34 @@ export const QuizManager: React.FC<QuizManagerProps> = ({ db, currentUser }) => 
                     onChange={(e) => setForm({ ...form, durasiMenit: Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden"
                   />
+                </div>
+              </div>
+
+              {/* Target Kelas Selection */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5 text-xs">Target Kelas / Rombel</label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 max-h-28 overflow-y-auto">
+                  {availableClasses.map((k) => {
+                    const isChecked = form.kelasIds?.includes(k.id) ?? false;
+                    return (
+                      <label key={k.id} className="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const cur = form.kelasIds || [];
+                            if (e.target.checked) {
+                              setForm({ ...form, kelasIds: [...cur, k.id] });
+                            } else {
+                              setForm({ ...form, kelasIds: cur.filter((id) => id !== k.id) });
+                            }
+                          }}
+                          className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="font-semibold text-slate-700">Kelas {k.nama}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 

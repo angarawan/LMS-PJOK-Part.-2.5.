@@ -17,7 +17,7 @@ import {
   Check,
 } from 'lucide-react';
 import { LMSDatabase, dataStorage } from '../../services/dataStorage';
-import { PresensiRecord, StatusPresensi, User } from '../../types';
+import { PresensiRecord, StatusPresensi, User, getTeacherAssignedClasses } from '../../types';
 
 interface RekapPresensiTableProps {
   db: LMSDatabase;
@@ -34,6 +34,14 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
   currentUser,
   onSwitchToInputHarian,
 }) => {
+  const availableClasses = useMemo(() => {
+    if (currentUser.role === 'GURU') {
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, db.kelas]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterBulan, setFilterBulan] = useState<string>('ALL');
   const [filterKedisiplinan, setFilterKedisiplinan] = useState<
@@ -450,9 +458,9 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
               onChange={(e) => onSelectKelasId(e.target.value)}
               className="w-full text-xs font-bold bg-white/10 border border-white/20 text-white rounded-xl px-3 py-2 focus:outline-hidden focus:bg-slate-900 cursor-pointer"
             >
-              {db.kelas.map((k) => (
+              {availableClasses.map((k) => (
                 <option key={k.id} value={k.id} className="bg-slate-900 text-white">
-                  Kelas {k.nama} ({k.jurusan || 'PJOK'})
+                  Kelas {k.nama} (Tingkat {k.tingkat})
                 </option>
               ))}
             </select>

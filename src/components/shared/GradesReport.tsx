@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileSpreadsheet,
   Download,
@@ -21,19 +21,26 @@ interface GradesReportProps {
 }
 
 export const GradesReport: React.FC<GradesReportProps> = ({ db, currentUser, onOpenSheets }) => {
-  const assignedClasses = useMemo(() => {
+  const availableClasses = useMemo(() => {
     if (currentUser.role === 'GURU') {
-      return getTeacherAssignedClasses(currentUser, db.kelas);
+      const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
+      return assigned.length > 0 ? assigned : db.kelas;
     }
     return db.kelas;
   }, [currentUser, db.kelas]);
 
   const [selectedKelasId, setSelectedKelasId] = useState<string>(() => {
-    if (currentUser.role === 'GURU' && assignedClasses.length > 0) {
-      return assignedClasses[0].id;
+    if (availableClasses.length > 0) {
+      return availableClasses[0].id;
     }
     return db.kelas.length > 0 ? db.kelas[0].id : 'cls-xi-1';
   });
+
+  useEffect(() => {
+    if (availableClasses.length > 0 && !availableClasses.some((k) => k.id === selectedKelasId)) {
+      setSelectedKelasId(availableClasses[0].id);
+    }
+  }, [availableClasses, selectedKelasId]);
   const [selectedSemester, setSelectedSemester] = useState<string>('1 (Ganjil)');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
@@ -272,14 +279,11 @@ export const GradesReport: React.FC<GradesReportProps> = ({ db, currentUser, onO
               onChange={(e) => setSelectedKelasId(e.target.value)}
               className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5"
             >
-              {db.kelas.map((k) => {
-                const isAssigned = assignedClasses.some((a) => a.id === k.id);
-                return (
-                  <option key={k.id} value={k.id}>
-                    {isAssigned ? '★ ' : ''}Kelas {k.nama} {isAssigned ? '(Kelas Anda)' : ''}
-                  </option>
-                );
-              })}
+              {availableClasses.map((k) => (
+                <option key={k.id} value={k.id}>
+                  Kelas {k.nama} (Tingkat {k.tingkat})
+                </option>
+              ))}
             </select>
           </div>
 

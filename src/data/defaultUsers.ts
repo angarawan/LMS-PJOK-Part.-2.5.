@@ -383,35 +383,37 @@ export const DEFAULT_USERS: User[] = RAW_USERS_CSV_DATA.map((r) => {
     user.nip = r.nip;
     if (isGuru) {
       if (r.username === 'ratna') {
-        user.mataPelajaran = 'PJOK Putri & Senam';
-        user.kelasDiampuIds = ['cls-xi-3', 'cls-xi-5'];
-        user.kelasDiampu = ['XI 3', 'XI 5'];
+        user.mataPelajaran = 'PJOK Kelas X (Fase E)';
+        user.kelasDiampuIds = ['cls-x-1', 'cls-x-2', 'cls-x-3', 'cls-x-4'];
+        user.kelasDiampu = ['X 1', 'X 2', 'X 3', 'X 4'];
       } else if (r.username === 'haryono') {
-        user.mataPelajaran = 'PJOK Atletik & Bela Diri';
-        user.kelasDiampuIds = ['cls-xi-4', 'cls-xi-6'];
-        user.kelasDiampu = ['XI 4', 'XI 6'];
+        user.mataPelajaran = 'PJOK Kelas XII (Fase F)';
+        user.kelasDiampuIds = ['cls-xii-1', 'cls-xii-2', 'cls-xii-3', 'cls-xii-4'];
+        user.kelasDiampu = ['XII 1', 'XII 2', 'XII 3', 'XII 4'];
       } else {
-        user.mataPelajaran = 'PJOK Permainan Bola & Kebugaran';
-        user.kelasDiampuIds = ['cls-xi-1', 'cls-xi-2'];
-        user.kelasDiampu = ['XI 1', 'XI 2'];
+        user.mataPelajaran = 'PJOK Kelas XI (Fase F)';
+        user.kelasDiampuIds = ['cls-xi-1', 'cls-xi-2', 'cls-xi-3', 'cls-xi-4'];
+        user.kelasDiampu = ['XI 1', 'XI 2', 'XI 3', 'XI 4'];
       }
     }
   } else {
     user.nis = r.nip;
     user.nip = r.nip; // preserve nip column compatibility
     
-    // Distribute students across classes so every teacher has students in their classes
+    // Distribute students across classes so every teacher has students in their classes (X, XI, XII)
     const studentIdx = parseInt(r.username.replace('usr-murid-', ''), 10) || 1;
-    if (studentIdx <= 10) {
+    if (studentIdx <= 6) {
+      user.kelasId = 'cls-x-1';
+    } else if (studentIdx <= 11) {
+      user.kelasId = 'cls-x-2';
+    } else if (studentIdx <= 17) {
       user.kelasId = 'cls-xi-1';
-    } else if (studentIdx <= 18) {
+    } else if (studentIdx <= 22) {
       user.kelasId = 'cls-xi-2';
-    } else if (studentIdx <= 24) {
-      user.kelasId = 'cls-xi-3';
-    } else if (studentIdx <= 28) {
-      user.kelasId = 'cls-xi-4';
+    } else if (studentIdx <= 26) {
+      user.kelasId = 'cls-xii-1';
     } else {
-      user.kelasId = 'cls-xi-5';
+      user.kelasId = 'cls-xii-2';
     }
     
     user.tahunPelajaran = '2026/2027';
@@ -441,6 +443,25 @@ export const DEFAULT_USERS: User[] = RAW_USERS_CSV_DATA.map((r) => {
   return user;
 });
 
+// Class name mapping helper
+const KELAS_NAME_MAP: Record<string, string> = {
+  'cls-x-1': 'X 1',
+  'cls-x-2': 'X 2',
+  'cls-x-3': 'X 3',
+  'cls-x-4': 'X 4',
+  'cls-xi-1': 'XI 1',
+  'cls-xi-2': 'XI 2',
+  'cls-xi-3': 'XI 3',
+  'cls-xi-4': 'XI 4',
+  'cls-xi-5': 'XI 5',
+  'cls-xi-6': 'XI 6',
+  'cls-xi-7': 'XI 7',
+  'cls-xii-1': 'XII 1',
+  'cls-xii-2': 'XII 2',
+  'cls-xii-3': 'XII 3',
+  'cls-xii-4': 'XII 4',
+};
+
 // Generate default RekapNilaiMurid for all 31 students
 export const DEFAULT_NILAI: RekapNilaiMurid[] = DEFAULT_USERS.filter((u) => u.role === 'MURID').map((m, idx) => {
   // Deterministic realistic scores
@@ -453,13 +474,16 @@ export const DEFAULT_NILAI: RekapNilaiMurid[] = DEFAULT_USERS.filter((u) => u.ro
   const nilaiAkhir = Math.round(pengetahuan * 0.3 + keterampilan * 0.5 + sikap * 0.2);
   const predikat = nilaiAkhir >= 88 ? 'A' : nilaiAkhir >= 78 ? 'B' : 'C';
 
+  const kId = m.kelasId || 'cls-xi-1';
+  const kNama = KELAS_NAME_MAP[kId] || 'XI 1';
+
   return {
     id: `nil-${idx + 1}`,
     muridId: m.id,
     muridNama: m.name,
     nis: m.nis || m.nip || `75${String(idx + 1).padStart(2, '0')}`,
-    kelasId: 'cls-xi-1',
-    kelasNama: 'XI 1',
+    kelasId: kId,
+    kelasNama: kNama,
     semester: '1 (Ganjil)',
     tugas: baseTugas,
     quiz: baseQuiz,

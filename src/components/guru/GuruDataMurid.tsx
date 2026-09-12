@@ -28,15 +28,15 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
     return getTeacherAssignedClasses(currentUser, db.kelas);
   }, [currentUser, db.kelas]);
 
-  const [showAllClasses, setShowAllClasses] = useState<boolean>(false);
-
   const visibleClasses = useMemo(() => {
-    if (showAllClasses || assignedClasses.length === 0) return db.kelas;
-    return assignedClasses;
-  }, [showAllClasses, assignedClasses, db.kelas]);
+    if (currentUser?.role === 'GURU') {
+      return assignedClasses.length > 0 ? assignedClasses : db.kelas;
+    }
+    return db.kelas;
+  }, [currentUser, assignedClasses, db.kelas]);
 
   const [selectedKelasId, setSelectedKelasId] = useState<string>(() => {
-    return assignedClasses.length > 0 ? assignedClasses[0].id : (db.kelas[0]?.id || 'cls-xi-1');
+    return visibleClasses.length > 0 ? visibleClasses[0].id : (db.kelas[0]?.id || 'cls-xi-1');
   });
 
   // Keep selectedKelasId valid if visible classes change
@@ -127,40 +127,26 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
           </p>
         </div>
 
-        {/* Class switcher buttons and scope toggle */}
+        {/* Class switcher buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80">
             {visibleClasses.map((k) => {
-              const isAssigned = assignedClasses.some((a) => a.id === k.id);
               const isSelected = selectedKelasId === k.id;
               return (
                 <button
                   key={k.id}
                   onClick={() => setSelectedKelasId(k.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                     isSelected
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                   }`}
                 >
-                  <span>{k.nama}</span>
-                  {isAssigned && !isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  )}
+                  <span>Kelas {k.nama}</span>
                 </button>
               );
             })}
           </div>
-
-          {assignedClasses.length > 0 && assignedClasses.length < db.kelas.length && (
-            <button
-              type="button"
-              onClick={() => setShowAllClasses(!showAllClasses)}
-              className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-colors shrink-0"
-            >
-              {showAllClasses ? 'Hanya Kelas Diampu' : 'Lihat Semua Rombel'}
-            </button>
-          )}
         </div>
       </div>
 
