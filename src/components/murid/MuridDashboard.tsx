@@ -293,7 +293,9 @@ export const MuridDashboard: React.FC<MuridDashboardProps> = ({ db, currentUser,
               <p className="text-[11px] leading-relaxed">
                 Seluruh siswa XI wajib mengenakan seragam olahraga lengkap dan sepatu kets untuk pengambilan nilai praktik bola voli.
               </p>
-              <span className="text-[10px] text-amber-700 block pt-1">Oleh: Pak Haryono, S.Pd.Jas</span>
+              <span className="text-[10px] text-amber-700 block pt-1">
+                Oleh: {db.settings?.guruPjokNama || db.settings?.namaGuruPJOKUtama || 'Guru PJOK'}
+              </span>
             </div>
 
             <div className="p-3 rounded-xl bg-sky-50/70 border border-sky-100/80 space-y-1 text-sky-900">

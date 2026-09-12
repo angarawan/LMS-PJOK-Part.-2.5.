@@ -210,6 +210,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
     }));
   };
 
+  const handleDeleteUser = (user: User) => {
+    if (user.role === 'ADMIN' && db.users.filter((u) => u.role === 'ADMIN').length <= 1) {
+      alert('Tidak dapat menghapus satu-satunya akun Administrator!');
+      return;
+    }
+    if (window.confirm(`Hapus pengguna "${user.name}" (@${user.username})?`)) {
+      dataStorage.updateDatabase((prev) => ({
+        ...prev,
+        users: prev.users.filter((u) => u.id !== user.id),
+      }));
+      showToast(`Pengguna "${user.name}" berhasil dihapus.`);
+    }
+  };
+
   const handleResetPassword = () => {
     if (!resetPassUser) return;
     alert(`Password untuk pengguna ${resetPassUser.name} (${resetPassUser.username}) berhasil direset menjadi: ${newPassword}`);
@@ -501,16 +515,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
                         <button
                           onClick={() => handleOpenEdit(u)}
                           title="Edit Pengguna"
-                          className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setResetPassUser(u)}
                           title="Reset Password"
-                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                         >
                           <KeyRound className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          title="Hapus Pengguna"
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>

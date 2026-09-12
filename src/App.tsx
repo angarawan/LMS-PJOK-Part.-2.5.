@@ -345,7 +345,7 @@ export default function App() {
         </footer>
       </div>
 
-      {/* Login & Demo Role Switcher Modal */}
+      {/* Login & Account Switcher Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}

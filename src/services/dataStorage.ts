@@ -200,7 +200,7 @@ const DEFAULT_QUIZ_SOAL: Soal[] = [
 
 export const INITIAL_DATABASE: LMSDatabase = {
   settings: {
-    namaSekolah: 'SMAN 1 Olahraga Nusantara',
+    namaSekolah: 'SMA Negeri 1 Kintamani (SMANSAKA)',
     logoSekolah: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=150&auto=format&fit=crop&q=80',
     tahunPelajaran: '2026/2027',
     semester: 'Ganjil',

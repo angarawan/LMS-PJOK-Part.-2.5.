@@ -192,75 +192,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </button>
           </form>
 
-          {/* Quick Account Switcher for Demo / Testing */}
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Akun Cepat (1-Klik Masuk):
-            </span>
-            <div className="grid grid-cols-2 gap-1.5 text-left">
-              <button
-                type="button"
-                onClick={() => {
-                  const guruUser = (db.users || []).find((u) => u.role === 'GURU');
-                  if (guruUser) handleSelect(guruUser);
-                }}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 text-[11px] transition-colors group cursor-pointer"
-              >
-                <div className="font-bold text-slate-800 group-hover:text-emerald-700 flex items-center justify-between">
-                  <span>Guru PJOK</span>
-                  <span className="text-[9px] px-1 bg-emerald-100 text-emerald-800 rounded">Pak Nova</span>
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">NIP: 19881115...</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const adminUser = (db.users || []).find((u) => u.role === 'ADMIN');
-                  if (adminUser) handleSelect(adminUser);
-                }}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-purple-50 hover:border-purple-200 border border-slate-200 text-[11px] transition-colors group cursor-pointer"
-              >
-                <div className="font-bold text-slate-800 group-hover:text-purple-700 flex items-center justify-between">
-                  <span>Administrator</span>
-                  <span className="text-[9px] px-1 bg-purple-100 text-purple-800 rounded">Admin</span>
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">Pak Bambang</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const muridUser = (db.users || []).find((u) => u.name === 'Gede Aditya Peratama' || u.nis === '7504') || (db.users || []).find((u) => u.role === 'MURID');
-                  if (muridUser) handleSelect(muridUser);
-                }}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-sky-50 hover:border-sky-200 border border-slate-200 text-[11px] transition-colors group cursor-pointer"
-              >
-                <div className="font-bold text-slate-800 group-hover:text-sky-700 flex items-center justify-between">
-                  <span>Siswa 1 (L)</span>
-                  <span className="text-[9px] px-1 bg-sky-100 text-sky-800 rounded">NIS 7504</span>
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">Gede Aditya P.</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const muridUser2 = (db.users || []).find((u) => u.name === 'Ni Kadek Arini Putri' || u.nis === '7509') || (db.users || []).find((u) => u.role === 'MURID' && u.jenisKelamin === 'P');
-                  if (muridUser2) handleSelect(muridUser2);
-                }}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-rose-50 hover:border-rose-200 border border-slate-200 text-[11px] transition-colors group cursor-pointer"
-              >
-                <div className="font-bold text-slate-800 group-hover:text-rose-700 flex items-center justify-between">
-                  <span>Siswa 2 (P)</span>
-                  <span className="text-[9px] px-1 bg-rose-100 text-rose-800 rounded">NIS 7509</span>
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">Ni Kadek Arini P.</div>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2 text-center text-slate-400 text-[10px] space-y-0.5">
+          <div className="mt-4 pt-3 border-t border-slate-100 text-center text-slate-400 text-[10px] space-y-0.5">
             <div className="font-bold text-slate-500">VERSI 2.4.0 - 2026 PJOK SMANSAKA</div>
             <div>&copy; 2026 {schoolName} • Sistem LMS PJOK Terpadu</div>
           </div>

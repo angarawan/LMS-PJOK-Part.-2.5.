@@ -25,13 +25,13 @@ interface SchoolSettingsProps {
 
 export const SchoolSettings: React.FC<SchoolSettingsProps> = ({ db, currentUser, onOpenSheets }) => {
   const [settings, setSettings] = useState<SettingsApp>(() => ({
-    namaSekolah: 'SMAN 1 Olahraga Nusantara',
+    namaSekolah: 'SMA Negeri 1 Kintamani',
     tahunPelajaran: '2026/2027',
     semester: 'Ganjil',
     namaKepalaSekolah: 'Dr. Drs. I Nyoman Sukadana, M.Pd.',
     nipKepalaSekolah: '19690815 199412 1 002',
-    namaGuruPJOKUtama: 'Haryono, S.Pd.Jas, M.Or.',
-    nipGuruPJOKUtama: '19850314 201001 1 018',
+    namaGuruPJOKUtama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+    nipGuruPJOKUtama: '198811152022211013',
     mataPelajaran: 'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
     temaWarna: 'Biru & Hijau Sportif',
     terakhirSinkron: new Date().toISOString(),
@@ -87,7 +87,7 @@ export const SchoolSettings: React.FC<SchoolSettingsProps> = ({ db, currentUser,
   };
 
   const handleResetSampleData = () => {
-    if (window.confirm('Reset database kembali ke contoh data awal sekolah (31 siswa demo + materi bawaan)?')) {
+    if (window.confirm('Reset database kembali ke konfigurasi awal sistem?')) {
       dataStorage.resetToDefault();
       alert('Data telah direset kembali ke konfigurasi awal.');
       window.location.reload();
@@ -293,12 +293,15 @@ export const SchoolSettings: React.FC<SchoolSettingsProps> = ({ db, currentUser,
           </label>
 
           <button
-            onClick={handleResetSampleData}
-            className="p-3.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
-            title="Kembalikan ke data percontohan awal (31 siswa demo + kuis bawaan)"
+            onClick={() => {
+              setCleanConfirmInput('');
+              setShowCleanModal(true);
+            }}
+            className="p-3.5 bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+            title="Bersihkan data dummy/contoh (siswa, materi, kuis, nilai) agar sistem bersih"
           >
-            <RotateCcw className="w-4 h-4" />
-            Reset Data Contoh (Demo)
+            <Trash2 className="w-4 h-4 text-rose-600" />
+            Hapus / Bersihkan Data Dummy
           </button>
         </div>
       </div>
