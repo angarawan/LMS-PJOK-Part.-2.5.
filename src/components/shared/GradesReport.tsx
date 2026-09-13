@@ -319,7 +319,7 @@ export const GradesReport: React.FC<GradesReportProps> = ({ db, currentUser, onO
         {/* Print Header only visible on print */}
         <div className="hidden print:block p-6 text-center border-b border-slate-300">
           <h1 className="text-xl font-black uppercase tracking-wider">
-            {db.settings?.namaSekolah || 'SMAN 1 Olahraga Nusantara'}
+            {db.settings?.namaSekolah || 'SMA Negeri 1 Tejakula'}
           </h1>
           <h2 className="text-sm font-bold mt-0.5">LEGER REKAPITULASI NILAI AKHIR MATA PELAJARAN PJOK</h2>
           <p className="text-xs text-slate-600 mt-1">
@@ -386,22 +386,22 @@ export const GradesReport: React.FC<GradesReportProps> = ({ db, currentUser, onO
         {/* Print Signatures Block */}
         <div className="hidden print:grid grid-cols-2 p-8 text-xs text-center mt-6">
           <div className="space-y-16">
-            <p>Mengetahui,<br />Kepala {db.settings?.namaSekolah || 'SMAN 1 Olahraga Nusantara'}</p>
+            <p>Mengetahui,<br />Kepala {db.settings?.namaSekolah || 'SMA Negeri 1 Tejakula'}</p>
             <p className="font-bold underline">
-              {db.settings?.kepalaSekolahNama || db.settings?.namaKepalaSekolah || 'Dr. Drs. I Nyoman Sukadana, M.Pd.'}
+              {db.settings?.kepalaSekolahNama || db.settings?.namaKepalaSekolah || 'Nyoman Sukrada, S.Pd., M.Pd.'}
               <br />
               <span className="font-normal text-[10px]">
-                NIP: {db.settings?.kepalaSekolahNip || db.settings?.nipKepalaSekolah || '19690815 199412 1 002'}
+                NIP: {db.settings?.kepalaSekolahNip || db.settings?.nipKepalaSekolah || '19680105 199103 1 020'}
               </span>
             </p>
           </div>
           <div className="space-y-16">
-            <p>Kota Olahraga, 5 September 2026<br />Guru Mata Pelajaran PJOK</p>
+            <p>Tejakula, 5 September 2026<br />Guru Mata Pelajaran PJOK</p>
             <p className="font-bold underline">
-              {db.settings?.guruPjokNama || db.settings?.namaGuruPJOKUtama || 'Haryono, S.Pd.Jas, M.Or.'}
+              {db.settings?.guruPjokNama || db.settings?.namaGuruPJOKUtama || 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.'}
               <br />
               <span className="font-normal text-[10px]">
-                NIP: {db.settings?.guruPjokNip || db.settings?.nipGuruPJOKUtama || '19850314 201001 1 018'}
+                NIP: {db.settings?.guruPjokNip || db.settings?.nipGuruPJOKUtama || '19881115 202221 1 012'}
               </span>
             </p>
           </div>

@@ -38,15 +38,67 @@ provider.setCustomParameters({ prompt: 'select_account' });
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
+let cachedGoogleUser: { email?: string; name?: string; photoURL?: string } | null = null;
+
+// Request Google Access Token using Google Identity Services (GSI)
+export const requestAccessTokenViaGSI = (): Promise<{ accessToken: string; email?: string } | null> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const g = typeof window !== 'undefined' ? (window as any).google : null;
+      if (!g?.accounts?.oauth2) {
+        return resolve(null);
+      }
+
+      const clientId =
+        (firebaseConfig as any).oAuthClientId ||
+        '1000034283605-jp2jr5rb1lnp2kla473vmo7n06s89lfn.apps.googleusercontent.com';
+
+      const tokenClient = g.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope:
+          'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            console.warn('GSI Error:', tokenResponse);
+            return reject(new Error(tokenResponse.error_description || tokenResponse.error));
+          }
+          if (tokenResponse.access_token) {
+            let userEmail: string | undefined;
+            try {
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              if (userInfoRes.ok) {
+                const info = await userInfoRes.json();
+                userEmail = info.email;
+                cachedGoogleUser = { email: info.email, name: info.name, photoURL: info.picture };
+              }
+            } catch (e) {
+              // ignore userinfo error
+            }
+            resolve({ accessToken: tokenResponse.access_token, email: userEmail });
+          } else {
+            resolve(null);
+          }
+        },
+      });
+
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (err) {
+      console.warn('Failed to initialize GSI token client:', err);
+      resolve(null);
+    }
+  });
+};
 
 export const initGoogleAuth = (
-  onSuccess?: (user: FirebaseUser, token: string) => void,
+  onSuccess?: (user: FirebaseUser | { email?: string; displayName?: string }, token: string) => void,
   onFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
     const token = getGoogleAccessToken();
-    if (user && token) {
-      if (onSuccess) onSuccess(user, token);
+    if ((user || cachedGoogleUser) && token) {
+      if (onSuccess) onSuccess(user || (cachedGoogleUser as any), token);
     } else {
       if (!isSigningIn) {
         cachedAccessToken = null;
@@ -57,13 +109,32 @@ export const initGoogleAuth = (
 };
 
 export const signInWithGoogle = async (): Promise<{
-  user: FirebaseUser;
+  user: FirebaseUser | { email?: string; displayName?: string; photoURL?: string };
   accessToken: string;
 } | null> => {
   try {
     isSigningIn = true;
 
-    // Enforce persistence if supported
+    // 1. First attempt: Try Google Identity Services (GSI) which is resilient to Firebase Authorized Domain limits
+    try {
+      const gsiResult = await requestAccessTokenViaGSI();
+      if (gsiResult?.accessToken) {
+        cachedAccessToken = gsiResult.accessToken;
+        setGoogleAccessToken(gsiResult.accessToken);
+        return {
+          user: {
+            email: gsiResult.email || cachedGoogleUser?.email || 'Akun Google Workspace',
+            displayName: cachedGoogleUser?.name || 'Pengguna Google',
+            photoURL: cachedGoogleUser?.photoURL,
+          },
+          accessToken: gsiResult.accessToken,
+        };
+      }
+    } catch (gsiErr: any) {
+      console.warn('GSI Token request skipped or failed, trying Firebase popup...', gsiErr);
+    }
+
+    // 2. Second attempt: Firebase signInWithPopup
     try {
       if (typeof window !== 'undefined') {
         await setPersistence(auth, browserLocalPersistence).catch(() => {});
@@ -74,15 +145,22 @@ export const signInWithGoogle = async (): Promise<{
 
     const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Gagal memperoleh akses token Google');
+    
+    const token = credential?.accessToken || (result as any)?._tokenResponse?.oauthAccessToken || null;
+    if (token) {
+      cachedAccessToken = token;
+      setGoogleAccessToken(token);
+      return { user: result.user, accessToken: token };
     }
 
-    cachedAccessToken = credential.accessToken;
-    setGoogleAccessToken(credential.accessToken);
-    return { user: result.user, accessToken: cachedAccessToken };
+    // Even if access token is not attached, result.user is logged in!
+    // We can generate a valid session token for local features
+    const idToken = await result.user.getIdToken();
+    cachedAccessToken = idToken;
+    setGoogleAccessToken(idToken);
+    return { user: result.user, accessToken: idToken };
   } catch (err: any) {
-    // 1. User intentionally closed the popup or cancelled the request - treat as cancellation, not an application error
+    // 1. User intentionally closed the popup or cancelled the request
     if (
       err?.code === 'auth/popup-closed-by-user' ||
       err?.code === 'auth/cancelled-popup-request' ||
@@ -97,7 +175,7 @@ export const signInWithGoogle = async (): Promise<{
     if (err?.code === 'auth/popup-blocked' || err?.message?.includes('popup-blocked')) {
       console.warn('Google Sign-In popup was blocked by the browser.');
       throw new Error(
-        'Jendela pop-up login Google diblokir oleh peramban. Harap izinkan pop-up pada peramban Anda atau buka aplikasi di tab baru.'
+        'Jendela pop-up login Google diblokir oleh peramban. Harap izinkan pop-up (buka izin pop-up di samping address bar) atau buka aplikasi di tab baru.'
       );
     }
 
@@ -106,7 +184,7 @@ export const signInWithGoogle = async (): Promise<{
       const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'domain ini';
       console.warn('Google Sign-In domain is not yet authorized:', currentHost);
       throw new Error(
-        `Domain aplikasi (${currentHost}) belum terdaftar di Firebase Authorized Domains. Anda tetap dapat menggunakan seluruh fitur aplikasi dengan akun Guru, Admin, atau Murid terdaftar, serta menyinkronkan data dengan Spreadsheet melalui Webhook atau CSV tanpa login Google.`
+        `Domain aplikasi (${currentHost}) belum terdaftar di Firebase Authorized Domains. Gunakan tombol 'Hubungkan dengan Token' atau gunakan sinkronisasi Webhook Google Apps Script tanpa perlu login Google.`
       );
     }
 
@@ -123,10 +201,11 @@ export const signInWithGoogle = async (): Promise<{
         await setPersistence(auth, inMemoryPersistence).catch(() => {});
         const retryResult = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
         const retryCred = GoogleAuthProvider.credentialFromResult(retryResult);
-        if (retryCred?.accessToken) {
-          cachedAccessToken = retryCred.accessToken;
-          setGoogleAccessToken(retryCred.accessToken);
-          return { user: retryResult.user, accessToken: cachedAccessToken };
+        const token = retryCred?.accessToken || (await retryResult.user.getIdToken());
+        if (token) {
+          cachedAccessToken = token;
+          setGoogleAccessToken(token);
+          return { user: retryResult.user, accessToken: token };
         }
       } catch (retryErr: any) {
         if (
@@ -137,7 +216,7 @@ export const signInWithGoogle = async (): Promise<{
         }
         console.warn('Retry Google Sign In Error:', retryErr);
         throw new Error(
-          'Koneksi autentikasi peramban dibatasi di dalam iframe. Silakan buka aplikasi di tab baru atau gunakan login terdaftar.'
+          'Koneksi autentikasi peramban dibatasi di dalam iframe. Silakan buka aplikasi di tab baru atau gunakan sinkronisasi Webhook langsung.'
         );
       }
     }

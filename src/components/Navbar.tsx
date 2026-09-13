@@ -30,6 +30,7 @@ interface NavbarProps {
   onLogout?: () => void;
   onOpenSheetsModal?: () => void;
   onOpenGoogleSheets?: () => void;
+  onOpenProfileModal?: () => void;
   onSwitchRole?: (role: UserRole) => void;
   onSelectMenuItem?: (menuId: string, param?: string) => void;
   settings?: PengaturanSekolah;
@@ -43,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenSheetsModal,
   onOpenGoogleSheets,
+  onOpenProfileModal,
   onSwitchRole,
   onSelectMenuItem,
 }) => {
@@ -308,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Center: Version Pill Badge - Visible across every menu */}
       <div className="hidden xl:flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 border border-slate-200/90 rounded-full text-[11px] font-extrabold text-blue-950 tracking-wider shadow-2xs">
         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-        <span>VERSI 2.4.0 - 2026 PJOK SMANSAKA</span>
+        <span>VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA</span>
       </div>
 
       {/* Right: Actions, Notifications, & User Info */}
@@ -576,6 +578,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="inline-block mt-1.5 px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
                   {currentUser.role}
                 </span>
+              </div>
+
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    if (onOpenProfileModal) {
+                      onOpenProfileModal();
+                    } else if (onSelectMenuItem) {
+                      onSelectMenuItem('profil-saya');
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-slate-800 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-2 font-semibold transition-colors"
+                >
+                  <UserIcon className="w-4 h-4 text-blue-600" />
+                  <span>Profil & Foto Saya</span>
+                </button>
               </div>
 
               {currentUser.role === 'ADMIN' && (

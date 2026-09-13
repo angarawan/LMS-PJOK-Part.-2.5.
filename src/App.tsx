@@ -37,6 +37,8 @@ import { ContentManager } from './components/shared/ContentManager';
 import { AttendanceManager } from './components/shared/AttendanceManager';
 import { GradesReport } from './components/shared/GradesReport';
 import { PraktikAssessment } from './components/shared/PraktikAssessment';
+import { ProfilMandiri } from './components/shared/ProfilMandiri';
+import { ProfilModal } from './components/shared/ProfilModal';
 import { LoginPage } from './components/LoginPage';
 
 export default function App() {
@@ -57,6 +59,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<FirestoreSyncStatus>(dataStorage.getSyncStatus());
 
   // Keep currentUser synced if user profile/class assignments are updated in db
@@ -189,6 +192,14 @@ export default function App() {
               onOpenSheets={() => setIsSheetsModalOpen(true)}
             />
           );
+        case 'profil-saya':
+          return (
+            <ProfilMandiri
+              currentUser={currentUser}
+              db={db}
+              onUpdateUser={handleUserUpdate}
+            />
+          );
         default:
           return <AdminDashboard db={db} onNavigate={handleNavigate} />;
       }
@@ -240,6 +251,14 @@ export default function App() {
               onOpenSheets={() => setIsSheetsModalOpen(true)}
             />
           );
+        case 'profil-saya':
+          return (
+            <ProfilMandiri
+              currentUser={currentUser}
+              db={db}
+              onUpdateUser={handleUserUpdate}
+            />
+          );
         default:
           return <GuruDashboard db={db} currentUser={currentUser} onNavigate={handleNavigate} />;
       }
@@ -264,7 +283,7 @@ export default function App() {
           return <MuridPresensi db={db} currentUser={currentUser} />;
         case 'profil-saya':
           return (
-            <MuridProfil
+            <ProfilMandiri
               db={db}
               currentUser={currentUser}
               onUpdateUser={handleUserUpdate}
@@ -283,6 +302,8 @@ export default function App() {
       {/* Left Sidebar */}
       <Sidebar
         role={currentUser.role}
+        currentUser={currentUser}
+        appLogo={db.settings?.logoSekolah}
         activeMenu={activeMenu}
         onSelectMenu={handleNavigate}
         isOpen={isSidebarOpen}
@@ -300,6 +321,7 @@ export default function App() {
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
           onLogout={handleLogout}
           onOpenSheetsModal={() => setIsSheetsModalOpen(true)}
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
           onSwitchRole={handleRoleSwitch}
           onSelectMenuItem={(menuId, param) => {
             handleNavigate(menuId);
@@ -337,7 +359,7 @@ export default function App() {
         <footer className="h-12 bg-white border-t border-gray-200 flex items-center justify-between px-4 sm:px-8 text-[11px] text-slate-500 shrink-0 font-medium z-10">
           <div className="flex items-center gap-2">
             <span className="font-black text-blue-950 tracking-wider">
-              VERSI 2.4.0 - 2026 PJOK SMANSAKA
+              VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA
             </span>
             <span className="hidden md:inline text-slate-300">•</span>
             <span className="hidden md:inline text-slate-500">
@@ -345,7 +367,11 @@ export default function App() {
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-2 text-slate-500 font-semibold">
-            <span>{db.settings?.namaSekolah || 'SMA Negeri 1 Tejakula'}</span>
+            <span>
+              {!db.settings?.namaSekolah || db.settings.namaSekolah.includes('Kintamani')
+                ? 'SMA Negeri 1 Tejakula (SMANSAKA)'
+                : db.settings.namaSekolah}
+            </span>
             <span className="text-slate-300">•</span>
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
               v2.4.0
@@ -376,6 +402,15 @@ export default function App() {
         onDbUpdate={(newDb) => {
           dataStorage.updateDatabase(() => newDb);
         }}
+      />
+
+      {/* Profil Mandiri Modal */}
+      <ProfilModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        db={db}
+        onUpdateUser={handleUserUpdate}
       />
     </div>
   );

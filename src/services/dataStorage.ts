@@ -203,14 +203,14 @@ const DEFAULT_QUIZ_SOAL: Soal[] = [
 
 export const INITIAL_DATABASE: LMSDatabase = {
   settings: {
-    namaSekolah: 'SMA Negeri 1 Kintamani (SMANSAKA)',
+    namaSekolah: 'SMA Negeri 1 Tejakula (SMANSAKA)',
     logoSekolah: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=150&auto=format&fit=crop&q=80',
     tahunPelajaran: '2026/2027',
     semester: 'Ganjil',
-    namaKepalaSekolah: 'Dr. Drs. I Nyoman Sukadana, M.Pd.',
-    nipKepalaSekolah: '19690815 199412 1 002',
+    namaKepalaSekolah: 'Nyoman Sukrada, S.Pd., M.Pd.',
+    nipKepalaSekolah: '19680105 199103 1 020',
     namaGuruPJOKUtama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
-    nipGuruPJOKUtama: '198811152022211013',
+    nipGuruPJOKUtama: '19881115 202221 1 012',
     mataPelajaran: 'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
     temaWarna: 'Biru & Hijau Sportif',
     terakhirSinkron: new Date().toISOString(),
@@ -1204,9 +1204,25 @@ class DataStorageService {
           settings: {
             ...INITIAL_DATABASE.settings,
             ...(parsed?.settings || {}),
+            namaSekolah:
+              !parsed?.settings?.namaSekolah || parsed.settings.namaSekolah.includes('Kintamani')
+                ? 'SMA Negeri 1 Tejakula (SMANSAKA)'
+                : parsed.settings.namaSekolah,
+            namaKepalaSekolah:
+              !parsed?.settings?.namaKepalaSekolah || parsed.settings.namaKepalaSekolah.includes('Sukadana')
+                ? 'Nyoman Sukrada, S.Pd., M.Pd.'
+                : parsed.settings.namaKepalaSekolah,
+            nipKepalaSekolah:
+              !parsed?.settings?.nipKepalaSekolah || parsed.settings.nipKepalaSekolah.includes('19690815')
+                ? '19680105 199103 1 020'
+                : parsed.settings.nipKepalaSekolah,
             namaGuruPJOKUtama: parsed?.settings?.namaGuruPJOKUtama && parsed?.settings?.namaGuruPJOKUtama !== 'Haryono, S.Pd.Jas, M.Or.'
               ? parsed.settings.namaGuruPJOKUtama
               : primaryTeacher,
+            nipGuruPJOKUtama:
+              !parsed?.settings?.nipGuruPJOKUtama || parsed.settings.nipGuruPJOKUtama === '198811152022211013'
+                ? '19881115 202221 1 012'
+                : parsed.settings.nipGuruPJOKUtama,
           },
           users: loadedUsers,
           kelas: loadedKelas,
@@ -1290,6 +1306,10 @@ class DataStorageService {
   }
 
   public getDatabase(): LMSDatabase {
+    if (this.db?.settings?.namaSekolah && this.db.settings.namaSekolah.includes('Kintamani')) {
+      this.db.settings.namaSekolah = 'SMA Negeri 1 Tejakula (SMANSAKA)';
+      this.saveToLocalStorage(this.db);
+    }
     return this.db;
   }
 

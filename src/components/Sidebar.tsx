@@ -24,10 +24,12 @@ import {
   FileSpreadsheet,
   Sparkles,
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole, User as UserType } from '../types';
 
 interface SidebarProps {
   role: UserRole;
+  currentUser?: UserType;
+  appLogo?: string;
   activeMenu: string;
   onSelectMenu: (menuId: string) => void;
   isOpen?: boolean;
@@ -88,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'presensi', label: 'Presensi Siswa', icon: <CalendarCheck className="w-5 h-5" /> },
         { id: 'rekap-absensi', label: 'Rekapan Absensi', icon: <FileSpreadsheet className="w-5 h-5 text-emerald-400" /> },
         { id: 'nilai', label: 'Penilaian & Rapor', icon: <Award className="w-5 h-5" /> },
+        { id: 'profil-saya', label: 'Profil Saya', icon: <User className="w-5 h-5" /> },
         { id: 'settings', label: 'Pengaturan Sistem', icon: <Settings className="w-5 h-5" /> },
       ],
     },
@@ -121,8 +124,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      title: 'Pengaturan & Cadangan',
+      title: 'Pengaturan & Profil',
       items: [
+        { id: 'profil-saya', label: 'Profil Saya', icon: <User className="w-5 h-5" /> },
         { id: 'settings', label: 'Pengaturan & Reset Data', icon: <Settings className="w-5 h-5" /> },
       ],
     },
@@ -160,17 +164,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sidebarContent = (
     <div className="h-full flex flex-col bg-slate-900 text-slate-300 select-none">
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-6 bg-slate-950 shrink-0 border-b border-slate-800/80">
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3 shadow-xs">
-            <Zap className="w-5 h-5 text-white fill-white" />
+      <div className="min-h-18 py-3.5 flex items-center justify-between px-5 bg-slate-950 shrink-0 border-b border-slate-800/80">
+        <div className="flex items-center min-w-0 flex-1">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center mr-3 shadow-md shrink-0 overflow-hidden border border-white/10">
+            {appLogo ? (
+              <img src={appLogo} alt="Logo LMS PJOK" className="w-full h-full object-cover" />
+            ) : (
+              <Zap className="w-5 h-5 text-white fill-white" />
+            )}
           </div>
-          <div>
-            <span className="font-bold text-xl tracking-tight text-white block leading-none">
+          <div className="min-w-0 flex-1">
+            <span className="font-black text-lg tracking-tight text-white block leading-none">
               LMS PJOK
             </span>
-            <span className="text-[10px] text-blue-400 font-semibold tracking-wider uppercase mt-1 block">
-              {role === 'ADMIN' ? 'Admin Portal' : role === 'GURU' ? 'Guru Olahraga' : 'Portal Murid'}
+            {/* Tampilkan nama lengkap di bawah logo tulisan LMS PJOK nama guru/murid */}
+            <span
+              className="text-xs font-bold text-emerald-400 block truncate leading-tight mt-1"
+              title={currentUser?.name}
+            >
+              {currentUser?.name || (role === 'ADMIN' ? 'Admin PJOK' : role === 'GURU' ? 'Guru PJOK' : 'Siswa PJOK')}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium tracking-wide block truncate">
+              {role === 'ADMIN'
+                ? 'Administrator'
+                : role === 'GURU'
+                ? 'Guru Pengampu PJOK'
+                : currentUser?.kelasId ? `Siswa Kelas ${currentUser.kelasId}` : 'Siswa PJOK'}
             </span>
           </div>
         </div>
@@ -179,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onClose && (
           <button
             onClick={onClose}
-            className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
@@ -258,7 +277,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer Version Marker */}
       <div className="p-3.5 bg-slate-950 text-[10px] text-slate-400 text-center font-bold uppercase tracking-widest border-t border-slate-800/80 shrink-0">
-        VERSI 2.4.0 - 2026 PJOK SMANSAKA
+        VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA
       </div>
     </div>
   );

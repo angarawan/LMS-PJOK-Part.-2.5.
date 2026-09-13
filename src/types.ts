@@ -101,7 +101,7 @@ export interface Tugas {
   tanggalMulai?: string;
   deadline: string;
   fileLampiran?: string;
-  jenisPengumpulan?: 'Teks' | 'Video/Foto' | 'Dokumen';
+  jenisPengumpulan?: 'JAWAB_LANGSUNG' | 'UPLOAD_FILE' | 'KEDUANYA' | 'Teks' | 'Video/Foto' | 'Dokumen';
   status: 'Aktif' | 'Selesai' | 'Publish' | 'Draft';
   statusPublikasi?: 'Publish' | 'Draft';
   dibuatOleh?: string;
@@ -120,6 +120,7 @@ export interface PengumpulanTugas {
   tanggalKumpul: string;
   isiJawaban?: string;
   fileUrl?: string;
+  namaFile?: string;
   linkVideo?: string;
   catatanSiswa?: string;
   status: 'Belum Dikerjakan' | 'Sudah Dikumpulkan' | 'Dinilai' | 'Terlambat' | 'Dikumpulkan';

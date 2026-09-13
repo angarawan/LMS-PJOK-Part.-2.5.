@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   School,
   Save,
@@ -13,6 +13,9 @@ import {
   Check,
   X,
   RefreshCw,
+  Image as ImageIcon,
+  Camera,
+  Zap,
 } from 'lucide-react';
 import { SettingsApp, User } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
@@ -24,23 +27,86 @@ interface SchoolSettingsProps {
 }
 
 export const SchoolSettings: React.FC<SchoolSettingsProps> = ({ db, currentUser, onOpenSheets }) => {
-  const [settings, setSettings] = useState<SettingsApp>(() => ({
-    namaSekolah: 'SMA Negeri 1 Kintamani',
-    tahunPelajaran: '2026/2027',
-    semester: 'Ganjil',
-    namaKepalaSekolah: 'Dr. Drs. I Nyoman Sukadana, M.Pd.',
-    nipKepalaSekolah: '19690815 199412 1 002',
-    namaGuruPJOKUtama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
-    nipGuruPJOKUtama: '198811152022211013',
-    mataPelajaran: 'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
-    temaWarna: 'Biru & Hijau Sportif',
-    terakhirSinkron: new Date().toISOString(),
-    ...(db?.settings || {}),
-  }));
+  const [settings, setSettings] = useState<SettingsApp>(() => {
+    const raw = db?.settings || {};
+    const base: SettingsApp = {
+      namaSekolah: 'SMA Negeri 1 Tejakula (SMANSAKA)',
+      tahunPelajaran: '2026/2027',
+      semester: 'Ganjil',
+      namaKepalaSekolah: 'Nyoman Sukrada, S.Pd., M.Pd.',
+      nipKepalaSekolah: '19680105 199103 1 020',
+      namaGuruPJOKUtama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      nipGuruPJOKUtama: '19881115 202221 1 012',
+      mataPelajaran: 'Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)',
+      temaWarna: 'Biru & Hijau Sportif',
+      terakhirSinkron: new Date().toISOString(),
+    };
+
+    const merged: SettingsApp = { ...base, ...raw };
+    if (!merged.namaSekolah || merged.namaSekolah.includes('Kintamani')) {
+      merged.namaSekolah = 'SMA Negeri 1 Tejakula (SMANSAKA)';
+    }
+    if (!merged.namaKepalaSekolah || merged.namaKepalaSekolah.includes('Sukadana')) {
+      merged.namaKepalaSekolah = 'Nyoman Sukrada, S.Pd., M.Pd.';
+    }
+    if (!merged.nipKepalaSekolah || merged.nipKepalaSekolah.includes('19690815')) {
+      merged.nipKepalaSekolah = '19680105 199103 1 020';
+    }
+    if (!merged.nipGuruPJOKUtama || merged.nipGuruPJOKUtama === '198811152022211013') {
+      merged.nipGuruPJOKUtama = '19881115 202221 1 012';
+    }
+    return merged;
+  });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showCleanModal, setShowCleanModal] = useState(false);
   const [cleanConfirmInput, setCleanConfirmInput] = useState('');
   const [isProcessingClean, setIsProcessingClean] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas gambar yang valid (PNG, JPG, JPEG, WEBP, atau SVG).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Optimize image to max 400x400 to prevent large local storage usage
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/png', 0.9);
+          setSettings((prev) => ({ ...prev, logoSekolah: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,17 +228,70 @@ export const SchoolSettings: React.FC<SchoolSettingsProps> = ({ db, currentUser,
             />
           </div>
 
-          <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">
-              Logo Sekolah (URL)
+          <div className="sm:col-span-2 bg-slate-50 border border-slate-200/90 rounded-2xl p-4">
+            <label className="block font-bold text-slate-800 uppercase text-xs mb-2">
+              Icon & Logo Resmi Aplikasi LMS PJOK
             </label>
-            <input
-              type="text"
-              value={settings.logoSekolah || ''}
-              onChange={(e) => setSettings({ ...settings, logoSekolah: e.target.value })}
-              placeholder="https://..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
-            />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-white border-2 border-slate-200 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
+                {settings.logoSekolah ? (
+                  <img
+                    src={settings.logoSekolah}
+                    alt="Preview Logo"
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white">
+                    <Zap className="w-8 h-8 fill-white" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2 w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="input-logo-sekolah"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Pilih dari Galeri / Kamera</span>
+                  </button>
+                  {settings.logoSekolah && (
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, logoSekolah: '' })}
+                      className="px-3 py-2 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus / Gunakan Default</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Atau URL:</span>
+                  <input
+                    type="text"
+                    value={settings.logoSekolah || ''}
+                    onChange={(e) => setSettings({ ...settings, logoSekolah: e.target.value })}
+                    placeholder="https://... (URL gambar luar)"
+                    className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Logo ini akan tampil di sudut kiri atas (Sidebar & Navbar), halaman login, dan KOP laporan cetak.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div>

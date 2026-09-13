@@ -311,7 +311,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
                 {classFilter === 'ASSIGNED'
                   ? `Kelas yang Anda Ampu (${assignedClasses.map((k) => k.nama).join(', ') || 'Semua'})`
                   : classFilter === 'ALL'
-                  ? 'Semua Kelas Sekolah (XI 1 - XI 7)'
+                  ? 'Semua Rombel Kelas'
                   : `Kelas ${activeClasses[0]?.nama || ''}`}
               </span>
             </div>

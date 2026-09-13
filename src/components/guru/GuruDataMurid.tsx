@@ -54,6 +54,12 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
 
   const muridInKelas = db.users.filter((u) => {
     if (u.role !== 'MURID') return false;
+    if (selectedKelasId === 'all') {
+      const visibleClassIds = visibleClasses.map((k) => k.id.toLowerCase().trim());
+      const visibleClassNames = visibleClasses.map((k) => k.nama.toLowerCase().trim());
+      const uKelas = (u.kelasId || '').toLowerCase().trim();
+      return visibleClassIds.includes(uKelas) || visibleClassNames.includes(uKelas);
+    }
     const uKelas = (u.kelasId || '').toLowerCase().trim();
     const selId = (selectedKelasId || '').toLowerCase().trim();
     const selNama = (selectedKelasObj?.nama || '').toLowerCase().trim();
@@ -130,6 +136,16 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
         {/* Class switcher buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full bg-slate-100/70 p-1 rounded-2xl border border-slate-200/80">
+            <button
+              onClick={() => setSelectedKelasId('all')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                selectedKelasId === 'all'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <span>Semua Rombel Kelas</span>
+            </button>
             {visibleClasses.map((k) => {
               const isSelected = selectedKelasId === k.id;
               return (
@@ -154,14 +170,18 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center font-black text-sm border border-sky-100">
-            {selectedKelasObj?.nama}
+            {selectedKelasId === 'all' ? 'ALL' : selectedKelasObj?.nama}
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800">
-              Daftar Siswa Kelas {selectedKelasObj?.nama}
+              {selectedKelasId === 'all'
+                ? 'Daftar Siswa Semua Rombel Kelas'
+                : `Daftar Siswa Kelas ${selectedKelasObj?.nama}`}
             </h3>
             <p className="text-xs text-slate-400">
-              Wali Kelas: {selectedKelasObj?.waliKelasNama} • Total: {filteredMurid.length} Siswa
+              {selectedKelasId === 'all'
+                ? `Cakupan: ${visibleClasses.map((k) => k.nama).join(', ')} • Total: ${filteredMurid.length} Siswa`
+                : `Wali Kelas: ${selectedKelasObj?.waliKelasNama || '-'} • Total: ${filteredMurid.length} Siswa`}
             </p>
           </div>
         </div>

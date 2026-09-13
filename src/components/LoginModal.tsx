@@ -123,7 +123,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-500 text-white shadow-lg font-black text-xl mb-2">
             PJOK
           </div>
-          <h2 className="text-xl font-black tracking-tight text-white">LMS PJOK SMANSAKA</h2>
+          <h2 className="text-xl font-black tracking-tight text-white">LMS PJOK SMAN 1 TEJAKULA</h2>
           <p className="text-xs text-blue-200 mt-0.5">Pendidikan Jasmani, Olahraga, dan Kesehatan</p>
           <div className="inline-block mt-2 px-3 py-1 bg-white/10 rounded-full text-[11px] text-blue-100 border border-white/10">
             {schoolName}
@@ -212,7 +212,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </form>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-center text-slate-400 text-[10px] space-y-0.5">
-            <div className="font-bold text-slate-500">VERSI 2.4.0 - 2026 PJOK SMANSAKA</div>
+            <div className="font-bold text-slate-500">VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA</div>
             <div>&copy; 2026 {schoolName} • Sistem LMS PJOK Terpadu</div>
           </div>
         </div>

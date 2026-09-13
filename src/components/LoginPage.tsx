@@ -183,7 +183,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 text-center space-y-1">
             <p className="text-[10px] font-bold text-blue-400/90 tracking-widest uppercase">
-              PORTAL LMS PJOK SMANSAKA 2026
+              PORTAL LMS PJOK SMAN 1 TEJAKULA 2026
             </p>
           </div>
         </div>

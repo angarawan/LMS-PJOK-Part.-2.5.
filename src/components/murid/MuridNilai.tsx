@@ -127,7 +127,7 @@ export const MuridNilai: React.FC<MuridNilaiProps> = ({ db, currentUser }) => {
           <h3 className="text-2xl font-black tracking-tight">{currentUser.name}</h3>
           <p className="text-xs text-slate-300">
             NIS: {currentUser.nis || '-'} • Kelas {kelasObj?.nama || currentUser.kelasId} •{' '}
-            {db.settings?.namaSekolah || 'SMAN 1 Olahraga Nusantara'}
+            {db.settings?.namaSekolah || 'SMA Negeri 1 Tejakula'}
           </p>
         </div>
 

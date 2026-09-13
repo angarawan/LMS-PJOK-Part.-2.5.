@@ -438,7 +438,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-white/10 rounded-full text-[11px] font-semibold text-blue-200 backdrop-blur-xs">
               <CalendarCheck className="w-3 h-3 text-emerald-400" />
-              <span>Presensi Guru PJOK • VERSI 2.4.0 - 2026 PJOK SMANSAKA</span>
+              <span>Presensi Guru PJOK • VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight">
               Presensi Siswa Harian
@@ -1076,7 +1076,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
             </div>
             <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <span className="text-[10px] font-black tracking-wider text-blue-800 bg-blue-100/90 border border-blue-200 px-2.5 py-1 rounded-full uppercase">
-                VERSI 2.4.0 - 2026 PJOK SMANSAKA
+                VERSI 2.4.0 - 2026 PJOK SMAN 1 TEJAKULA
               </span>
             </div>
           </div>

@@ -439,7 +439,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
               onChange={(e) => setSelectedKelas(e.target.value)}
               className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="all">Semua Rombel (XI 1 - XI 7)</option>
+              <option value="all">Semua Rombel Kelas</option>
               {db.kelas.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.nama}
