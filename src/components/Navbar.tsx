@@ -166,7 +166,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 z-30">
       {/* Left: Mobile Toggle & Global Search */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           onClick={handleSidebarClick}
           id="btn-sidebar-toggle"
@@ -175,6 +175,23 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Mobile Header Brand & Name */}
+        <div className="md:hidden flex items-center gap-2 mr-1">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white overflow-hidden shadow-xs shrink-0">
+            {db.settings?.logoSekolah ? (
+              <img src={db.settings.logoSekolah} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-black text-xs">PJ</span>
+            )}
+          </div>
+          <div className="leading-tight max-w-[120px] truncate">
+            <span className="font-black text-[11px] text-slate-800 block leading-none">LMS PJOK</span>
+            <span className="text-[10px] text-emerald-600 font-bold block truncate leading-none mt-0.5" title={currentUser.name}>
+              {currentUser.name}
+            </span>
+          </div>
+        </div>
 
         {/* Search Bar - Professional Polish Pill Style */}
         <div ref={searchRef} className="relative w-56 sm:w-80 md:w-96">

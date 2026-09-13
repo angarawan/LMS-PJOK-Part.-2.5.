@@ -76,3 +76,89 @@ export const processAvatarImageFile = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
   });
 };
+
+/**
+ * Utility helper to handle document, letter, or proof photos.
+ * Compresses images to ~1200px max dimension with 0.82 JPEG quality
+ * for sharp readability of handwritten letters while keeping base64 under ~100-150KB.
+ * Also supports PDF files by reading data URL directly.
+ */
+export const processDocumentOrProofImage = (file: File, maxDim: number = 1280): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('Tidak ada file yang dipilih.'));
+      return;
+    }
+
+    // Support PDF directly
+    if (file.type === 'application/pdf') {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target?.result as string);
+      reader.onerror = () => reject(new Error('Gagal membaca dokumen PDF.'));
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('File harus berupa gambar (JPG, PNG, WebP) atau dokumen PDF.'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Quality 0.82 ensures signatures & text remain sharp and legible
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(dataUrl);
+        } catch (e) {
+          resolve(event.target?.result as string);
+        }
+      };
+
+      img.onerror = () => {
+        resolve(event.target?.result as string);
+      };
+
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Gagal membaca gambar berkas izin.'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+

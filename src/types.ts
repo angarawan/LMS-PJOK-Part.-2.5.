@@ -87,6 +87,14 @@ export interface Materi {
   dibuatPada?: string;
 }
 
+export interface SoalTugas {
+  id: string;
+  nomor: number;
+  pertanyaan: string;
+  petunjuk?: string;
+  bobot?: number;
+}
+
 export interface Tugas {
   id: string;
   judul: string;
@@ -98,6 +106,7 @@ export interface Tugas {
   kelasNama?: string;
   kelasIds?: string[];
   instruksi: string;
+  daftarSoal?: SoalTugas[];
   tanggalMulai?: string;
   deadline: string;
   fileLampiran?: string;
@@ -119,6 +128,7 @@ export interface PengumpulanTugas {
   kelasId?: string;
   tanggalKumpul: string;
   isiJawaban?: string;
+  jawabanPerSoal?: Record<string, string>;
   fileUrl?: string;
   namaFile?: string;
   linkVideo?: string;
@@ -257,6 +267,33 @@ export interface PenilaianPraktik {
 export type StatusPresensi = 'H' | 'S' | 'I' | 'A' | 'T'; 
 // H: Hadir, S: Sakit, I: Izin, A: Alpa, T: Terlambat
 
+export type KategoriIzin = 'Sakit' | 'Izin' | 'Dispensasi';
+export type StatusPengajuanIzin = 'Menunggu' | 'Disetujui' | 'Ditolak';
+
+export interface PengajuanIzin {
+  id: string;
+  muridId: string;
+  muridNama: string;
+  muridNis?: string;
+  kelasId: string;
+  kelasNama?: string;
+  tanggal: string; // YYYY-MM-DD
+  tanggalSelesai?: string; // YYYY-MM-DD (opsional jika izin lebih dari 1 hari)
+  kategori: KategoriIzin;
+  alasan: string;
+  namaOrangTua: string;
+  noHpOrangTua: string;
+  suratUrl: string; // Foto / dokumen surat bertandatangan ortu/wali
+  namaSurat?: string;
+  fotoBersamaOrangTuaUrl: string; // Foto siswa bersama ortu memegang surat
+  namaFotoBersama?: string;
+  status: StatusPengajuanIzin;
+  catatanGuru?: string;
+  diverifikasiOleh?: string;
+  tanggalPengajuan: string; // ISO string
+  tanggalVerifikasi?: string; // ISO string
+}
+
 export interface PresensiRecord {
   id: string;
   tanggal: string; // YYYY-MM-DD
@@ -287,6 +324,8 @@ export interface JurnalMengajar {
   jumlahTidakHadir?: number;
   catatanRefleksi?: string;
   catatanKhusus?: string;
+  hambatan?: string;
+  tindakLanjut?: string;
   jamKe?: string;
   guruId: string;
   guruNama: string;

@@ -23,16 +23,18 @@ import {
   MoveHorizontal,
   WrapText,
   SlidersHorizontal,
+  FileText,
 } from 'lucide-react';
 import { PresensiRecord, StatusPresensi, User, UserRole, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { RekapPresensiTable } from './RekapPresensiTable';
+import { PengajuanIzinManager } from './PengajuanIzinManager';
 
 interface AttendanceManagerProps {
   db: LMSDatabase;
   role: UserRole;
   currentUser: User;
-  initialTab?: 'harian' | 'rekap';
+  initialTab?: 'harian' | 'rekap' | 'surat-izin';
 }
 
 interface StatusConfig {
@@ -135,13 +137,15 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
   const [selectedTanggal, setSelectedTanggal] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
-  const [mainTab, setMainTab] = useState<'harian' | 'rekap'>(initialTab);
+  const [mainTab, setMainTab] = useState<'harian' | 'rekap' | 'surat-izin'>(initialTab || 'harian');
 
   useEffect(() => {
     if (initialTab) {
       setMainTab(initialTab);
     }
   }, [initialTab]);
+
+  const pendingIzinCount = (db.pengajuanIzin || []).filter((i) => i.status === 'Menunggu').length;
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | StatusPresensi>('ALL');
 
@@ -411,6 +415,23 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
             <TableIcon className="w-4 h-4 text-indigo-600" />
             <span>📊 Rekapan Absensi & Rekapitulasi</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setMainTab('surat-izin')}
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer relative ${
+              mainTab === 'surat-izin'
+                ? 'bg-white text-emerald-950 shadow-sm ring-2 ring-emerald-500 font-black'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+            }`}
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>Surat Izin & Sakit</span>
+            {pendingIzinCount > 0 && (
+              <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-black animate-pulse">
+                {pendingIzinCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="px-3 py-1 bg-white/70 rounded-xl text-[11px] font-semibold text-slate-600 flex items-center justify-between sm:justify-start gap-2">
@@ -429,6 +450,14 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
             if (tgl) setSelectedTanggal(tgl);
             setMainTab('harian');
           }}
+        />
+      ) : mainTab === 'surat-izin' ? (
+        <PengajuanIzinManager
+          db={db}
+          role={role}
+          currentUser={currentUser}
+          selectedKelasId={selectedKelasId}
+          onSelectKelasId={setSelectedKelasId}
         />
       ) : (
         <>
@@ -779,6 +808,14 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
               const activeConfig = STATUS_LIST.find((s) => s.key === currentStatus);
               const isEditingNote = editingNoteMuridId === murid.id;
               const hasCustomNote = currentNote && currentNote !== DEFAULT_KETERANGAN[currentStatus];
+              const matchingIzin = (db.pengajuanIzin || []).find(
+                (iz) =>
+                  iz.muridId === murid.id &&
+                  (iz.tanggal === selectedTanggal ||
+                    (iz.tanggalSelesai &&
+                      selectedTanggal >= iz.tanggal &&
+                      selectedTanggal <= iz.tanggalSelesai))
+              );
 
               return (
                 <div
@@ -820,6 +857,23 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
                             >
                               {murid.name}
                             </h4>
+                            {matchingIzin && (
+                              <button
+                                type="button"
+                                onClick={() => setMainTab('surat-izin')}
+                                className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 cursor-pointer transition shrink-0 ${
+                                  matchingIzin.status === 'Disetujui'
+                                    ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
+                                    : matchingIzin.status === 'Ditolak'
+                                    ? 'bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300'
+                                    : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300 animate-pulse'
+                                }`}
+                                title="Klik untuk membuka arsip surat izin & foto bersama orang tua"
+                              >
+                                <FileText className="w-2.5 h-2.5" />
+                                <span>Surat {matchingIzin.kategori} ({matchingIzin.status})</span>
+                              </button>
+                            )}
                             {currentStatus !== 'H' && (
                               <span
                                 className={`text-[9px] font-black px-1.5 py-0.2 rounded-md ${activeConfig?.badgeBg} ${activeConfig?.badgeText} shrink-0`}

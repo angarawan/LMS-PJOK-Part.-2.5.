@@ -18,6 +18,7 @@ import {
   RefleksiPembelajaran,
   JawabanRefleksiMurid,
   SoalRefleksi,
+  PengajuanIzin,
 } from '../types';
 import {
   collection,
@@ -59,6 +60,7 @@ export interface LMSDatabase {
   notifikasi: NotifikasiItem[];
   nilai: RekapNilaiMurid[];
   settings: PengaturanSekolah;
+  pengajuanIzin?: PengajuanIzin[];
   refleksi?: RefleksiPembelajaran[];
   jawabanRefleksi?: JawabanRefleksiMurid[];
   materiPraktikList?: string[];
@@ -562,27 +564,63 @@ Zona Latihan Efektif: 65% - 85% dari DNM.`,
       kelasId: 'cls-xi-1',
       kelasNama: 'XI 1',
       instruksi:
-        'Rekam video gerakan passing bawah mandiri atau berpasangan durasi 1-2 menit. Jelaskan 3 kesalahan umum (sikap badan terlalu tegak, siku menekuk, perkenaan tidak rata) yang sering terjadi pada awal belajar.',
+        'Rekam video gerakan passing bawah mandiri atau berpasangan durasi 1-2 menit. Jelaskan kesalahan umum yang sering terjadi pada awal belajar.',
+      daftarSoal: [
+        {
+          id: 'soal-tug1-1',
+          nomor: 1,
+          pertanyaan: 'Sebutkan dan jelaskan 3 kesalahan umum posisi tangan dan lengan saat melakukan passing bawah!',
+          petunjuk: 'Jelaskan posisi siku dan perkenaan bola pada lengan bawah.',
+          bobot: 50,
+        },
+        {
+          id: 'soal-tug1-2',
+          nomor: 2,
+          pertanyaan: 'Bagaimana posisi lutut dan berat badan yang tepat untuk menjaga stabilitas saat menerima servis keras lawan?',
+          petunjuk: 'Uraikan sudut tekukan lutut dan pusat gravitasi tubuh.',
+          bobot: 50,
+        },
+      ],
       tanggalMulai: '2026-09-01',
-      deadline: '2026-09-12 23:59',
-      jenisPengumpulan: 'Video/Foto',
-      status: 'Aktif',
-      dibuatOleh: 'Haryono, S.Pd.Jas',
+      deadline: '2026-09-30 23:59',
+      jenisPengumpulan: 'KEDUANYA',
+      status: 'Publish',
+      statusPublikasi: 'Publish',
+      dibuatOleh: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      guruNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
     },
     {
       id: 'tug-2',
-      judul: 'Laporan Jurnal Kebugaran Jasmani Mandiri 7 Hari',
+      judul: 'Analisis Teori dan Prinsip Kebugaran Jasmani Mandiri',
       materiId: 'mat-4',
       materiJudul: 'Kebugaran Jasmani & Pengukuran Denyut Nadi Maksimal',
       kelasId: 'cls-xi-1',
       kelasNama: 'XI 1',
       instruksi:
-        'Catat aktivitas fisik selama 7 hari berturut-turut meliputi jenis olahraga (jogging, push up, plank, skipping), durasi menit, denyut nadi sebelum dan sesudah latihan.',
+        'Jawablah butir-butir pertanyaan analisis kebugaran jasmani di bawah ini secara langsung dan mandiri tanpa copy-paste.',
+      daftarSoal: [
+        {
+          id: 'soal-tug2-1',
+          nomor: 1,
+          pertanyaan: 'Jelaskan rumus menghitung Denyut Nadi Maksimal (DNM) dan hitunglah zona latihan efektif (Target Heart Rate) untuk usia Anda saat ini!',
+          petunjuk: 'Gunakan rumus standar 220 - Usia dan rentang 65% - 85%.',
+          bobot: 50,
+        },
+        {
+          id: 'soal-tug2-2',
+          nomor: 2,
+          pertanyaan: 'Mengapa pemanasan dinamis dan pendinginan (cooling down) sangat krusial dalam pencegahan cedera otot saat berolahraga?',
+          petunjuk: 'Jelaskan dampaknya terhadap sirkulasi asam laktat dan elastisitas otot.',
+          bobot: 50,
+        },
+      ],
       tanggalMulai: '2026-09-03',
-      deadline: '2026-09-15 23:59',
-      jenisPengumpulan: 'Dokumen',
-      status: 'Aktif',
-      dibuatOleh: 'Ratna Sartika, S.Pd.',
+      deadline: '2026-09-30 23:59',
+      jenisPengumpulan: 'JAWAB_LANGSUNG',
+      status: 'Publish',
+      statusPublikasi: 'Publish',
+      dibuatOleh: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
+      guruNama: 'I Ketut Agus Nova Anggarawan, S.Pd., Gr.',
     },
   ],
   pengumpulanTugas: [],
@@ -622,6 +660,12 @@ Zona Latihan Efektif: 65% - 85% dari DNM.`,
       kehadiranRingkas: 'Hadir: 32, Izin: 1, Sakit: 1, Alpa: 0',
       catatanRefleksi:
         'Mayoritas siswa sudah rileks saat kontak dengan bola. Perlu perhatian khusus bagi 4 siswa yang masih sering mengayun tangan terlalu tinggi di atas pundak.',
+      materiJudul: 'Variasi Passing Bawah dan Formasi Bertahan Bola Voli',
+      kegiatan: 'Pemanasan dinamis jogging keliling lapangan 3 putaran, stretching statis, drill berpasangan 15 menit, game simulasi 3v3 setengah lapangan.',
+      jumlahHadir: 32,
+      jumlahTidakHadir: 2,
+      hambatan: '4 siswa masih sering mengayun tangan melebihi batas bahu sehingga bola memantul ke belakang.',
+      tindakLanjut: 'Diberikan latihan isolasi perkenaan bola statis bertahap bersama rekan sebaya.',
       guruId: 'usr-guru-1',
       guruNama: 'Haryono, S.Pd.Jas, M.Or.',
     },
@@ -734,6 +778,7 @@ Zona Latihan Efektif: 65% - 85% dari DNM.`,
     'Kebugaran Jasmani - Tes MFT & Push Up',
     'Atletik - Lari Cepat & Estafet',
   ],
+  pengajuanIzin: [],
 };
 
 export type FirestoreSyncStatus = 'connecting' | 'synced' | 'syncing' | 'offline' | 'error';
@@ -904,7 +949,11 @@ class DataStorageService {
               const data = docSnap.data();
 
               if (docId === 'settings' && data?.data) {
-                incoming.settings = { ...this.db.settings, ...data.data };
+                const s = { ...data.data };
+                if (!s.namaSekolah || s.namaSekolah.includes('Kintamani')) {
+                  s.namaSekolah = 'SMA Negeri 1 Tejakula (SMANSAKA)';
+                }
+                incoming.settings = { ...this.db.settings, ...s };
                 hasIncomingData = true;
               } else if (data && Array.isArray(data.items)) {
                 (incoming as any)[docId] = data.items;
@@ -913,10 +962,19 @@ class DataStorageService {
             });
 
             if (hasIncomingData) {
+              const currentNamaSekolah = incoming.settings?.namaSekolah || this.db.settings?.namaSekolah;
+              const cleanNamaSekolah =
+                !currentNamaSekolah || currentNamaSekolah.includes('Kintamani')
+                  ? 'SMA Negeri 1 Tejakula (SMANSAKA)'
+                  : currentNamaSekolah;
+
               this.db = {
                 ...this.db,
                 ...incoming,
-                settings: incoming.settings || this.db.settings,
+                settings: {
+                  ...(incoming.settings || this.db.settings),
+                  namaSekolah: cleanNamaSekolah,
+                },
               };
 
               this.saveToLocalStorage(this.db);
@@ -972,6 +1030,7 @@ class DataStorageService {
         'refleksi',
         'jawabanRefleksi',
         'materiPraktikList',
+        'pengajuanIzin',
       ];
 
       for (const sec of sections) {
@@ -1026,6 +1085,7 @@ class DataStorageService {
         'refleksi',
         'jawabanRefleksi',
         'materiPraktikList',
+        'pengajuanIzin',
       ];
 
       const changedSections = sections.filter((sec) => prev[sec] !== next[sec]);
@@ -1240,6 +1300,20 @@ class DataStorageService {
                 ...t,
                 guruNama: t.guruNama === 'Haryono, S.Pd.Jas' ? primaryTeacher : (t.guruNama || t.dibuatOleh || primaryTeacher),
                 dibuatOleh: t.dibuatOleh === 'Haryono, S.Pd.Jas' ? primaryTeacher : (t.dibuatOleh || t.guruNama || primaryTeacher),
+                daftarSoal:
+                  Array.isArray(t.daftarSoal) && t.daftarSoal.length > 0
+                    ? t.daftarSoal
+                    : (t.jenisPengumpulan === 'JAWAB_LANGSUNG' || t.jenisPengumpulan === 'KEDUANYA') && t.instruksi
+                    ? [
+                        {
+                          id: `soal-${t.id}-1`,
+                          nomor: 1,
+                          pertanyaan: t.instruksi,
+                          petunjuk: '',
+                          bobot: 100,
+                        },
+                      ]
+                    : [],
               })))
             : (isCleanSlate ? [] : INITIAL_DATABASE.tugas),
           pengumpulanTugas: Array.isArray(parsed?.pengumpulanTugas) ? parsed.pengumpulanTugas : (isCleanSlate ? [] : INITIAL_DATABASE.pengumpulanTugas),
@@ -1287,6 +1361,7 @@ class DataStorageService {
           refleksi: Array.isArray(parsed?.refleksi) ? parsed.refleksi : INITIAL_DATABASE.refleksi,
           jawabanRefleksi: Array.isArray(parsed?.jawabanRefleksi) ? parsed.jawabanRefleksi : [],
           materiPraktikList: Array.isArray(parsed?.materiPraktikList) ? parsed.materiPraktikList : INITIAL_DATABASE.materiPraktikList,
+          pengajuanIzin: Array.isArray(parsed?.pengajuanIzin) ? parsed.pengajuanIzin : [],
           isNilaiPresensiReset: parsed?.isNilaiPresensiReset ?? false,
         };
       }
@@ -1346,6 +1421,9 @@ class DataStorageService {
   public updateDatabase(updater: (prev: LMSDatabase) => LMSDatabase) {
     const prev = this.db;
     const next = updater(prev);
+    if (next.settings?.namaSekolah && next.settings.namaSekolah.includes('Kintamani')) {
+      next.settings.namaSekolah = 'SMA Negeri 1 Tejakula (SMANSAKA)';
+    }
     this.db = next;
     this.notify();
     // Sinkronkan perubahan secara asinkron ke Firestore
@@ -1417,6 +1495,7 @@ class DataStorageService {
         },
       ],
       nilai: [],
+      pengajuanIzin: [],
     };
 
     this.db = cleanDb;

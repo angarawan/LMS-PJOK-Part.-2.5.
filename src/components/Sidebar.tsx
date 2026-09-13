@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -23,8 +23,10 @@ import {
   X,
   FileSpreadsheet,
   Sparkles,
+  Camera,
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../types';
+import { dataStorage } from '../services/dataStorage';
 
 interface SidebarProps {
   role: UserRole;
@@ -49,6 +51,8 @@ interface MenuSection {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   role,
+  currentUser,
+  appLogo,
   activeMenu,
   onSelectMenu,
   isOpen = false,
@@ -56,6 +60,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenGoogleSheets,
   onLogout,
 }) => {
+  const adminLogoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDirectLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas gambar yang valid (PNG, JPG, SVG, atau WEBP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/png', 0.9);
+          dataStorage.updateDatabase((prev) => ({
+            ...prev,
+            settings: {
+              ...prev.settings,
+              logoSekolah: dataUrl,
+            },
+          }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getAdminSections = (): MenuSection[] => [
     {
       title: 'Utama',
@@ -164,33 +216,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sidebarContent = (
     <div className="h-full flex flex-col bg-slate-900 text-slate-300 select-none">
       {/* Brand Header */}
-      <div className="min-h-18 py-3.5 flex items-center justify-between px-5 bg-slate-950 shrink-0 border-b border-slate-800/80">
-        <div className="flex items-center min-w-0 flex-1">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center mr-3 shadow-md shrink-0 overflow-hidden border border-white/10">
-            {appLogo ? (
-              <img src={appLogo} alt="Logo LMS PJOK" className="w-full h-full object-cover" />
-            ) : (
-              <Zap className="w-5 h-5 text-white fill-white" />
+      <div className="min-h-20 py-3.5 flex items-center justify-between px-4 bg-slate-950 shrink-0 border-b border-slate-800/80">
+        <div className="flex items-center min-w-0 flex-1 gap-3">
+          {/* Logo container with quick change for Admin */}
+          <div className="relative group/logo shrink-0">
+            <div
+              onClick={() => {
+                if (role === 'ADMIN') {
+                  adminLogoInputRef.current?.click();
+                }
+              }}
+              className={`w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center shadow-md overflow-hidden border border-white/10 ${
+                role === 'ADMIN' ? 'cursor-pointer hover:ring-2 hover:ring-emerald-400' : ''
+              }`}
+              title={role === 'ADMIN' ? 'Klik untuk mengganti icon / logo aplikasi' : 'Logo LMS PJOK'}
+            >
+              {appLogo ? (
+                <img src={appLogo} alt="Logo LMS PJOK" className="w-full h-full object-cover" />
+              ) : (
+                <Zap className="w-6 h-6 text-white fill-white" />
+              )}
+              {role === 'ADMIN' && (
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/logo:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+                  <Camera className="w-4 h-4 text-white" />
+                </div>
+              )}
+            </div>
+            {role === 'ADMIN' && (
+              <input
+                ref={adminLogoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleDirectLogoUpload}
+                className="hidden"
+                id="sidebar-admin-logo-upload"
+              />
             )}
           </div>
+
           <div className="min-w-0 flex-1">
-            <span className="font-black text-lg tracking-tight text-white block leading-none">
-              LMS PJOK
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-black text-base tracking-tight text-white block leading-none">
+                LMS PJOK
+              </span>
+              <span className="text-[9px] font-black bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.5 rounded leading-none">
+                SMANSAKA
+              </span>
+            </div>
             {/* Tampilkan nama lengkap di bawah logo tulisan LMS PJOK nama guru/murid */}
-            <span
-              className="text-xs font-bold text-emerald-400 block truncate leading-tight mt-1"
+            <div
+              className="text-xs font-bold text-emerald-400 block truncate leading-snug mt-1"
               title={currentUser?.name}
             >
               {currentUser?.name || (role === 'ADMIN' ? 'Admin PJOK' : role === 'GURU' ? 'Guru PJOK' : 'Siswa PJOK')}
-            </span>
-            <span className="text-[10px] text-slate-400 font-medium tracking-wide block truncate">
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium tracking-wide block truncate">
               {role === 'ADMIN'
-                ? 'Administrator'
+                ? 'SMA Negeri 1 Tejakula • Admin'
                 : role === 'GURU'
-                ? 'Guru Pengampu PJOK'
-                : currentUser?.kelasId ? `Siswa Kelas ${currentUser.kelasId}` : 'Siswa PJOK'}
-            </span>
+                ? 'SMA Negeri 1 Tejakula • Guru'
+                : currentUser?.kelasId
+                ? `SMAN 1 Tejakula • Kelas ${currentUser.kelasId}`
+                : 'SMA Negeri 1 Tejakula • Siswa'}
+            </div>
           </div>
         </div>
 

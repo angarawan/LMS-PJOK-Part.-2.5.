@@ -22,8 +22,10 @@ import {
   ChevronRight,
   Filter,
   Upload,
+  ListOrdered,
+  HelpCircle,
 } from 'lucide-react';
-import { Tugas, PengumpulanTugas, User, getTeacherAssignedClasses } from '../../types';
+import { Tugas, PengumpulanTugas, User, SoalTugas, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { InAppMediaModal } from './InAppMediaModal';
 import { UploadDataModal } from './UploadDataModal';
@@ -83,6 +85,7 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
   const [form, setForm] = useState<Partial<Tugas>>({
     judul: '',
     kategori: 'Praktik Gerak Mandiri',
+    jenisPengumpulan: 'JAWAB_LANGSUNG',
     instruksi: '',
     deadline: '2026-09-30T23:59',
     kelasIds: availableClasses.map((k) => k.id),
@@ -180,21 +183,82 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
     setForm({
       judul: '',
       kategori: 'Praktik Gerak Mandiri',
+      jenisPengumpulan: 'JAWAB_LANGSUNG',
       instruksi: '',
+      daftarSoal: [
+        {
+          id: `soal-${Date.now()}-1`,
+          nomor: 1,
+          pertanyaan: '',
+          petunjuk: '',
+          bobot: 100,
+        },
+      ],
       deadline: '2026-09-30T23:59',
       kelasIds: availableClasses.map((k) => k.id),
       status: 'Publish',
+      statusPublikasi: 'Publish',
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (t: Tugas) => {
     setEditingTugas(t);
+    const existingSoal =
+      t.daftarSoal && t.daftarSoal.length > 0
+        ? t.daftarSoal
+        : t.jenisPengumpulan === 'JAWAB_LANGSUNG' || t.jenisPengumpulan === 'KEDUANYA' || !t.jenisPengumpulan
+        ? [
+            {
+              id: `soal-${Date.now()}-1`,
+              nomor: 1,
+              pertanyaan: t.instruksi || '',
+              petunjuk: '',
+              bobot: 100,
+            },
+          ]
+        : [];
+
     setForm({
       ...t,
+      jenisPengumpulan: t.jenisPengumpulan || 'JAWAB_LANGSUNG',
+      daftarSoal: existingSoal,
       kelasIds: t.kelasIds || (t.kelasId ? [t.kelasId] : availableClasses.map((k) => k.id)),
     });
     setIsModalOpen(true);
+  };
+
+  const handleAddSoal = () => {
+    const cur = form.daftarSoal || [];
+    const nextNomor = cur.length + 1;
+    const newS: SoalTugas = {
+      id: `soal-${Date.now()}-${nextNomor}`,
+      nomor: nextNomor,
+      pertanyaan: '',
+      petunjuk: '',
+      bobot: 100,
+    };
+    setForm((prev) => ({
+      ...prev,
+      daftarSoal: [...(prev.daftarSoal || []), newS],
+    }));
+  };
+
+  const handleRemoveSoal = (index: number) => {
+    const cur = form.daftarSoal || [];
+    const updated = cur.filter((_, i) => i !== index).map((s, idx) => ({ ...s, nomor: idx + 1 }));
+    setForm((prev) => ({
+      ...prev,
+      daftarSoal: updated,
+    }));
+  };
+
+  const handleUpdateSoal = (index: number, field: keyof SoalTugas, val: any) => {
+    const cur = [...(form.daftarSoal || [])];
+    if (cur[index]) {
+      cur[index] = { ...cur[index], [field]: val };
+      setForm((prev) => ({ ...prev, daftarSoal: cur }));
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -204,8 +268,31 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
       return;
     }
 
+    const finalStatus = form.status === 'Draft' || form.statusPublikasi === 'Draft' ? 'Draft' : 'Publish';
+    const isJawabLangsung = form.jenisPengumpulan === 'JAWAB_LANGSUNG' || form.jenisPengumpulan === 'KEDUANYA' || !form.jenisPengumpulan;
+
+    // Filter and clean questions
+    let cleanedDaftarSoal: SoalTugas[] = [];
+    if (isJawabLangsung && form.daftarSoal) {
+      cleanedDaftarSoal = form.daftarSoal
+        .filter((s) => s.pertanyaan && s.pertanyaan.trim())
+        .map((s, idx) => ({ ...s, nomor: idx + 1 }));
+
+      // If direct answering is picked but no specific questions were typed, use instruksi as Soal 1
+      if (cleanedDaftarSoal.length === 0 && form.instruksi?.trim()) {
+        cleanedDaftarSoal = [
+          {
+            id: `soal-${Date.now()}-1`,
+            nomor: 1,
+            pertanyaan: form.instruksi.trim(),
+            petunjuk: '',
+            bobot: 100,
+          },
+        ];
+      }
+    }
+
     if (editingTugas) {
-      const finalStatus = form.status === 'Draft' || form.statusPublikasi === 'Draft' ? 'Draft' : 'Publish';
       dataStorage.updateDatabase((prev) => ({
         ...prev,
         tugas: prev.tugas.map((item) =>
@@ -213,6 +300,8 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
             ? ({
                 ...item,
                 ...form,
+                daftarSoal: cleanedDaftarSoal,
+                jenisPengumpulan: form.jenisPengumpulan || 'JAWAB_LANGSUNG',
                 status: finalStatus as any,
                 statusPublikasi: finalStatus as any,
               } as Tugas)
@@ -220,13 +309,14 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
         ),
       }));
     } else {
-      const finalStatus = form.status === 'Draft' || form.statusPublikasi === 'Draft' ? 'Draft' : 'Publish';
       const newT: Tugas = {
         id: `tug-${Date.now()}`,
         judul: form.judul || 'Tugas Baru',
         subJudul: form.subJudul || '',
         kategori: form.kategori || 'Praktik Gerak Mandiri',
-        instruksi: form.instruksi || '',
+        instruksi: form.instruksi || (cleanedDaftarSoal[0]?.pertanyaan ?? ''),
+        daftarSoal: cleanedDaftarSoal,
+        jenisPengumpulan: form.jenisPengumpulan || 'JAWAB_LANGSUNG',
         deadline: form.deadline || '2026-09-30T23:59',
         kelasIds: form.kelasIds && form.kelasIds.length > 0 ? form.kelasIds : availableClasses.map((k) => k.id),
         status: finalStatus,
@@ -520,6 +610,16 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
                         </p>
                       </div>
 
+                      {/* Question count badge */}
+                      {t.daftarSoal && t.daftarSoal.length > 0 && (
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <span className="px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg text-[10px] font-extrabold flex items-center gap-1">
+                            <ListOrdered className="w-3.5 h-3.5 text-sky-600" />
+                            {t.daftarSoal.length} Butir Soal Terlampir
+                          </span>
+                        </div>
+                      )}
+
                       {/* Target Classes */}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] text-slate-400 font-semibold">Target Rombel:</span>
@@ -782,6 +882,120 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
               </p>
             </div>
 
+            {/* Preview Jawaban & Lampiran Siswa */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 text-xs max-h-64 overflow-y-auto">
+              {(() => {
+                const correspondingTugas = db.tugas.find((t) => t.id === activeReviewSubmission.tugasId);
+                const hasDaftarSoal = correspondingTugas?.daftarSoal && correspondingTugas.daftarSoal.length > 0;
+
+                if (hasDaftarSoal) {
+                  return (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-sky-900 border-b border-slate-200/80 pb-1.5">
+                        <ListOrdered className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Jawaban Siswa per Butir Soal:</span>
+                      </div>
+                      {correspondingTugas!.daftarSoal!.map((soal, sIdx) => {
+                        const ans =
+                          activeReviewSubmission.jawabanPerSoal?.[soal.id] ||
+                          activeReviewSubmission.jawabanPerSoal?.[String(sIdx + 1)] ||
+                          '';
+
+                        return (
+                          <div key={soal.id || sIdx} className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="font-extrabold text-[11px] text-sky-950">
+                                Soal #{sIdx + 1}:
+                              </span>
+                              {soal.petunjuk && (
+                                <span className="text-[10px] text-slate-400 italic">
+                                  {soal.petunjuk}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-slate-700 font-semibold text-xs leading-relaxed bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                              {soal.pertanyaan}
+                            </p>
+                            <div className="pt-0.5">
+                              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">
+                                Jawaban Siswa:
+                              </span>
+                              {ans ? (
+                                <div className="p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-lg text-slate-900 font-medium whitespace-pre-wrap leading-relaxed">
+                                  {ans}
+                                </div>
+                              ) : (
+                                <div className="p-2 bg-slate-50 rounded-lg text-slate-400 italic text-[11px] border border-dashed border-slate-200">
+                                  (Siswa belum mengisi jawaban untuk butir soal ini)
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                if (activeReviewSubmission.isiJawaban) {
+                  return (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-sky-900">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Jawaban Langsung Siswa:</span>
+                      </div>
+                      <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                        {activeReviewSubmission.isiJawaban}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
+              {activeReviewSubmission.catatanSiswa && (
+                <div className="text-slate-600 text-[11px] pt-1 border-t border-slate-100">
+                  <strong>Catatan Siswa:</strong> "{activeReviewSubmission.catatanSiswa}"
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {activeReviewSubmission.fileUrl && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMediaModal({
+                        isOpen: true,
+                        url: activeReviewSubmission.fileUrl!,
+                        title: `Lampiran - ${activeReviewSubmission.muridNama}`,
+                        category: 'Berkas Portofolio / Foto',
+                      })
+                    }
+                    className="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 hover:bg-sky-200"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Lihat Berkas / Foto / PDF
+                  </button>
+                )}
+                {activeReviewSubmission.linkVideo && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMediaModal({
+                        isOpen: true,
+                        url: activeReviewSubmission.linkVideo!,
+                        title: `Video - ${activeReviewSubmission.muridNama}`,
+                        category: 'Video Gerakan',
+                      })
+                    }
+                    className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 hover:bg-rose-200"
+                  >
+                    <Video className="w-3.5 h-3.5" /> Buka Link Video
+                  </button>
+                )}
+              </div>
+            </div>
+
             <form onSubmit={handleSaveNilai} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
@@ -933,20 +1147,33 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
                 </div>
               </div>
 
+              {/* Kategori Manual & Deadline */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Kategori Tugas</label>
-                  <select
-                    value={form.kategori || 'Praktik Gerak Mandiri'}
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Kategori Tugas (Ketik Manual) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Praktik Bola Voli, Analisis Gerak..."
+                    value={form.kategori || ''}
                     onChange={(e) => setForm({ ...form, kategori: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden"
-                  >
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-sky-500/20 font-medium"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="text-[10px] text-slate-400 font-semibold self-center mr-0.5">Saran:</span>
+                    {categories.slice(0, 3).map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setForm({ ...form, kategori: tag })}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-sky-50 hover:text-sky-700 text-slate-600 rounded-md text-[10px] transition-colors"
+                      >
+                        {tag}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>
@@ -958,6 +1185,83 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
                     onChange={(e) => setForm({ ...form, deadline: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden"
                   />
+                </div>
+              </div>
+
+              {/* Pilihan Metode Pengumpulan Tugas */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Pilihan Metode Pengumpulan Tugas *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between transition-all ${
+                      form.jenisPengumpulan === 'JAWAB_LANGSUNG' || !form.jenisPengumpulan
+                        ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-2 ring-sky-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="radio"
+                        name="jenisPengumpulanTugas"
+                        value="JAWAB_LANGSUNG"
+                        checked={form.jenisPengumpulan === 'JAWAB_LANGSUNG' || !form.jenisPengumpulan}
+                        onChange={() => setForm({ ...form, jenisPengumpulan: 'JAWAB_LANGSUNG' })}
+                        className="text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="font-extrabold text-xs text-sky-900">Menjawab Langsung</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Siswa mengetik langsung di aplikasi. <strong>Copy-paste dinonaktifkan</strong> untuk orisinalitas jawaban.
+                    </p>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between transition-all ${
+                      form.jenisPengumpulan === 'UPLOAD_FILE'
+                        ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-2 ring-sky-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="radio"
+                        name="jenisPengumpulanTugas"
+                        value="UPLOAD_FILE"
+                        checked={form.jenisPengumpulan === 'UPLOAD_FILE'}
+                        onChange={() => setForm({ ...form, jenisPengumpulan: 'UPLOAD_FILE' })}
+                        className="text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="font-extrabold text-xs text-sky-900">Upload Berkas</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Siswa mengunggah file foto dokumentasi praktik, dokumen PDF, atau link video.
+                    </p>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between transition-all ${
+                      form.jenisPengumpulan === 'KEDUANYA'
+                        ? 'bg-sky-50/80 border-sky-400 text-sky-950 ring-2 ring-sky-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="radio"
+                        name="jenisPengumpulanTugas"
+                        value="KEDUANYA"
+                        checked={form.jenisPengumpulan === 'KEDUANYA'}
+                        onChange={() => setForm({ ...form, jenisPengumpulan: 'KEDUANYA' })}
+                        className="text-sky-600 focus:ring-sky-500"
+                      />
+                      <span className="font-extrabold text-xs text-sky-900">Bisa Keduanya</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Siswa dapat mengetik uraian langsung sekaligus melampirkan berkas foto/PDF.
+                    </p>
+                  </label>
                 </div>
               </div>
 
@@ -992,14 +1296,114 @@ export const TugasManager: React.FC<TugasManagerProps> = ({ db, currentUser }) =
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Instruksi Lengkap Tugas *</label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   required
-                  placeholder="Instruksikan siswa untuk merekam video berdurasi 30-60 detik, memperhatikan sudut pandang kamera, dan aspek yang dinilai..."
+                  placeholder="Instruksikan siswa untuk memahami konteks tugas, kriteria penilaian, dan langkah-langkah pengerjaan..."
                   value={form.instruksi || ''}
                   onChange={(e) => setForm({ ...form, instruksi: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-hidden text-xs font-medium"
                 />
               </div>
+
+              {/* Kolom Soal Uraian untuk Menjawab Langsung */}
+              {(form.jenisPengumpulan === 'JAWAB_LANGSUNG' ||
+                form.jenisPengumpulan === 'KEDUANYA' ||
+                !form.jenisPengumpulan) && (
+                <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-sky-100">
+                    <div>
+                      <h4 className="text-xs font-black text-sky-950 flex items-center gap-1.5 uppercase tracking-wide">
+                        <ListOrdered className="w-4 h-4 text-sky-600" />
+                        Kolom Soal / Pertanyaan Tugas Uraian *
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Tuliskan butir-butir pertanyaan di bawah ini. Murid akan mendapatkan kolom jawaban tersendiri untuk setiap soal dengan proteksi anti copy-paste.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddSoal}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Tambah Soal
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(!form.daftarSoal || form.daftarSoal.length === 0) && (
+                      <div className="p-3 bg-white rounded-xl border border-dashed border-sky-200 text-center text-xs text-slate-500">
+                        Belum ada butir soal. Klik tombol "Tambah Soal" untuk membuat pertanyaan.
+                      </div>
+                    )}
+
+                    {(form.daftarSoal || []).map((soal, sIdx) => (
+                      <div
+                        key={soal.id || sIdx}
+                        className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-0.5 bg-sky-100 text-sky-900 font-extrabold text-[11px] rounded-md">
+                            Soal No. {sIdx + 1}
+                          </span>
+                          {(form.daftarSoal?.length || 0) > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSoal(sIdx)}
+                              className="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Hapus Butir Soal Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            Teks Soal / Pertanyaan *
+                          </label>
+                          <textarea
+                            rows={2}
+                            required
+                            placeholder={`Tuliskan butir pertanyaan No. ${sIdx + 1} di sini...`}
+                            value={soal.pertanyaan}
+                            onChange={(e) => handleUpdateSoal(sIdx, 'pertanyaan', e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-sky-400 font-medium leading-relaxed"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">
+                              Petunjuk / Rubrik Khusus (Opsional):
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Misal: Jelaskan minimal 3 tahapan gerak..."
+                              value={soal.petunjuk || ''}
+                              onChange={(e) => handleUpdateSoal(sIdx, 'petunjuk', e.target.value)}
+                              className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:bg-white focus:outline-hidden"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">
+                              Bobot Nilai:
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={soal.bobot || 100}
+                              onChange={(e) => handleUpdateSoal(sIdx, 'bobot', Number(e.target.value))}
+                              className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] focus:bg-white focus:outline-hidden"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button

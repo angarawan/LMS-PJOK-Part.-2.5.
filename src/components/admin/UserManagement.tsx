@@ -298,7 +298,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ db, initialTab =
             Manajemen Data Pengguna LMS
           </h2>
           <p className="text-xs text-slate-500">
-            Kelola akun Admin, Guru Pengampu PJOK, dan Murid Rombel XI
+            Kelola akun Admin, Guru Pengampu PJOK, dan Murid Seluruh Rombel Kelas
           </p>
         </div>
         <div className="flex items-center flex-wrap gap-2">

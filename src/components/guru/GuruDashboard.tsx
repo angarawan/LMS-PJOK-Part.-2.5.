@@ -210,7 +210,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
     {
       title: 'Kelas Diajar',
       value: `${totalKelas} Kelas`,
-      sub: 'Rombel XI 1 s/d XI 7',
+      sub: 'Semua Rombel Kelas Diampu',
       icon: <School className="w-5 h-5 text-sky-600" />,
       color: 'bg-sky-50 text-sky-900 border-sky-100',
       action: () => onNavigate('data-murid'),
@@ -360,7 +360,7 @@ export const GuruDashboard: React.FC<GuruDashboardProps> = ({ db, currentUser, o
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
             }`}
           >
-            Semua Rombel
+            Semua Rombel Kelas
           </button>
         </div>
       </div>
