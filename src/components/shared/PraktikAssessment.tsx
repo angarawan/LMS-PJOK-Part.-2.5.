@@ -1314,9 +1314,9 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-3 w-10 text-center sticky left-0 bg-slate-50 z-20">No</th>
-                  <th className="py-3 px-3 w-28 sticky left-10 bg-slate-50 z-20">NIS</th>
-                  <th className="py-3 px-4 min-w-[180px] sticky left-38 bg-slate-50 z-20 shadow-xs">
+                  <th className="py-3 px-2 w-[44px] min-w-[44px] max-w-[44px] text-center sticky left-0 bg-slate-50 z-20">No</th>
+                  <th className="py-3 px-3 w-[100px] min-w-[100px] max-w-[100px] sticky left-[44px] bg-slate-50 z-20">NIS</th>
+                  <th className="py-3 px-4 w-[220px] min-w-[220px] max-w-[260px] sticky left-[144px] bg-slate-50 z-20 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] border-r-2 border-slate-300">
                     Nama Siswa
                   </th>
 
@@ -1349,13 +1349,13 @@ export const PraktikAssessment: React.FC<PraktikAssessmentProps> = ({ db, curren
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-3 text-center text-slate-400 sticky left-0 bg-white">
+                      <td className="py-2.5 px-2 w-[44px] min-w-[44px] max-w-[44px] text-center text-slate-400 sticky left-0 bg-white z-10">
                         {idx + 1}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 sticky left-10 bg-white">
+                      <td className="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] font-mono text-slate-500 sticky left-[44px] bg-white z-10">
                         {m.nis || '-'}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-slate-800 sticky left-38 bg-white shadow-xs">
+                      <td className="py-2.5 px-4 w-[220px] min-w-[220px] max-w-[260px] font-bold text-slate-800 sticky left-[144px] bg-white z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] border-r-2 border-slate-300 truncate">
                         {m.name}
                       </td>
 

@@ -16,8 +16,11 @@ import {
   Activity,
   HeartPulse,
   Award,
+  BookOpen,
+  Copy,
+  Check,
 } from 'lucide-react';
-import { User as UserType, KategoriIzin, PengajuanIzin, NotifikasiItem } from '../../types';
+import { User as UserType, KategoriIzin, PengajuanIzin, NotifikasiItem, PresensiRecord, StatusPresensi } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { processDocumentOrProofImage } from '../../utils/imageHelper';
 
@@ -58,14 +61,20 @@ export const ModalAjukanIzin: React.FC<ModalAjukanIzinProps> = ({
   const [namaFotoBersama, setNamaFotoBersama] = useState<string>('');
   const [isUploadingFotoBersama, setIsUploadingFotoBersama] = useState<boolean>(false);
 
-  // Preview Image Modal
+  // Preview Image Modal & Template Modal
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
+  const [selectedTemplateTab, setSelectedTemplateTab] = useState<'sakit_ortu' | 'izin_ortu' | 'surat_dokter'>('sakit_ortu');
+  const [copiedTemplate, setCopiedTemplate] = useState<boolean>(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const suratInputRef = useRef<HTMLInputElement>(null);
   const fotoBersamaInputRef = useRef<HTMLInputElement>(null);
+
+  const kelasNama =
+    db.kelas?.find((k) => k.id === currentUser.kelasId)?.nama || currentUser.kelasId || 'Kelas XI';
 
   if (!isOpen) return null;
 
@@ -165,12 +174,72 @@ export const ModalAjukanIzin: React.FC<ModalAjukanIzinProps> = ({
         dibaca: false,
       };
 
+      // Automatic Attendance Synchronization:
+      // When a student submits a leave/sick request, immediately record it in attendance
+      // so teacher and student see the synced status ('S' or 'I') without waiting
+      const presensiStatus: StatusPresensi = kategori === 'Sakit' ? 'S' : 'I';
+      const newPresensiRecord: PresensiRecord = {
+        id: `prs-${currentUser.id}-${tanggalMulai}`,
+        tanggal: tanggalMulai,
+        kelasId: currentUser.kelasId || '',
+        kelasNama: kelasNama,
+        muridId: currentUser.id,
+        muridNama: currentUser.name,
+        status: presensiStatus,
+        keterangan: `Surat ${kategori}: ${alasan.trim()} (Menunggu Verifikasi Guru)`,
+      };
+
+      // Direct persistent backup to prevent any loss on browser refresh
+      try {
+        const backupStr = localStorage.getItem('lms_pengajuan_izin_backup');
+        const currentBackup: PengajuanIzin[] = backupStr ? JSON.parse(backupStr) : [];
+        const updatedBackup = [newPengajuan, ...currentBackup.filter((p) => p.id !== newPengajuan.id)];
+        localStorage.setItem('lms_pengajuan_izin_backup', JSON.stringify(updatedBackup));
+      } catch (e) {
+        console.warn('Backup pengajuan izin locally:', e);
+      }
+
       dataStorage.updateDatabase((prev) => {
         const existingList = Array.isArray(prev.pengajuanIzin) ? prev.pengajuanIzin : [];
         const existingNotif = Array.isArray(prev.notifikasi) ? prev.notifikasi : [];
+        const existingPresensi = Array.isArray(prev.presensi) ? prev.presensi : [];
+
+        // If multi-day, generate presensi records for days in range
+        const recordsToInsert: PresensiRecord[] = [newPresensiRecord];
+        if (isMultiDay && tanggalSelesai && tanggalSelesai > tanggalMulai) {
+          try {
+            const startD = new Date(tanggalMulai);
+            const endD = new Date(tanggalSelesai);
+            const cur = new Date(startD);
+            cur.setDate(cur.getDate() + 1);
+            while (cur <= endD) {
+              const dStr = cur.toISOString().slice(0, 10);
+              recordsToInsert.push({
+                id: `prs-${currentUser.id}-${dStr}`,
+                tanggal: dStr,
+                kelasId: currentUser.kelasId || '',
+                kelasNama: kelasNama,
+                muridId: currentUser.id,
+                muridNama: currentUser.name,
+                status: presensiStatus,
+                keterangan: `Surat ${kategori}: ${alasan.trim()} (Menunggu Verifikasi Guru)`,
+              });
+              cur.setDate(cur.getDate() + 1);
+            }
+          } catch (e) {
+            // fallback
+          }
+        }
+
+        const insertedDates = new Set(recordsToInsert.map((r) => r.tanggal));
+        const filteredOldPresensi = existingPresensi.filter(
+          (p) => !(p.muridId === currentUser.id && insertedDates.has(p.tanggal))
+        );
+
         return {
           ...prev,
-          pengajuanIzin: [newPengajuan, ...existingList],
+          pengajuanIzin: [newPengajuan, ...existingList.filter((p) => p.id !== newPengajuan.id)],
+          presensi: [...recordsToInsert, ...filteredOldPresensi],
           notifikasi: [notifItem, ...existingNotif],
         };
       });
@@ -373,6 +442,31 @@ export const ModalAjukanIzin: React.FC<ModalAjukanIzinProps> = ({
               />
             </div>
 
+            {/* Banner Panduan & Contoh Format Surat Izin / Sakit */}
+            <div className="bg-gradient-to-r from-amber-50 via-amber-100/60 to-orange-50 p-3.5 rounded-2xl border border-amber-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-amber-950 block">
+                    Belum Punya Surat / Belum Ada Surat Dokter?
+                  </span>
+                  <p className="text-[11px] text-amber-800 leading-snug">
+                    Lihat contoh format surat izin orang tua (tulis tangan) & surat keterangan sakit sementara sebelum periksa dokter.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(true)}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shrink-0 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Lihat Contoh Surat</span>
+              </button>
+            </div>
+
             {/* Upload Bagian 1: Surat Ditandatangani Orang Tua */}
             <div className="space-y-2 p-4 bg-sky-50/50 rounded-2xl border border-sky-100">
               <div className="flex items-start justify-between gap-2">
@@ -573,6 +667,203 @@ export const ModalAjukanIzin: React.FC<ModalAjukanIzinProps> = ({
                 alt="Zoom Preview"
                 className="max-h-[70vh] w-auto object-contain rounded-xl shadow-lg"
               />
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Contoh & Format Surat Izin / Sakit */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 my-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    Contoh & Pedoman Format Surat
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Salin teks atau jadikan panduan menulis tangan pada kertas bergaris
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Template Selector Tabs */}
+            <div className="flex gap-1.5 p-1.5 bg-slate-100 rounded-2xl mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateTab('sakit_ortu');
+                  setCopiedTemplate(false);
+                }}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition ${
+                  selectedTemplateTab === 'sakit_ortu'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                1. Sakit (Ortu)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateTab('izin_ortu');
+                  setCopiedTemplate(false);
+                }}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition ${
+                  selectedTemplateTab === 'izin_ortu'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                2. Izin Keluarga
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateTab('surat_dokter');
+                  setCopiedTemplate(false);
+                }}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition ${
+                  selectedTemplateTab === 'surat_dokter'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                3. Pedoman Dokter
+              </button>
+            </div>
+
+            {/* Template Content */}
+            <div className="mt-4 space-y-3">
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl text-[11px] text-amber-900">
+                <span className="font-bold block mb-0.5">
+                  {selectedTemplateTab === 'sakit_ortu' && 'Panduan Surat Sakit Tulis Tangan Orang Tua:'}
+                  {selectedTemplateTab === 'izin_ortu' && 'Panduan Surat Izin Urusan Keluarga:'}
+                  {selectedTemplateTab === 'surat_dokter' && 'Panduan Surat Dokter / Klinik Medis:'}
+                </span>
+                {selectedTemplateTab === 'sakit_ortu' &&
+                  'Dapat ditulis tangan oleh orang tua pada selembar kertas folio/HVS bergaris, lalu ditandatangani dan difoto bersama orang tua.'}
+                {selectedTemplateTab === 'izin_ortu' &&
+                  'Wajib mencantumkan alasan yang jelas, jangka waktu izin, dan tanda tangan asli orang tua/wali siswa.'}
+                {selectedTemplateTab === 'surat_dokter' &&
+                  'Jika sakit lebih dari 2 hari atau kondisi berat, surat keterangan dokter dengan stempel puskesmas/klinik wajib dilampirkan.'}
+              </div>
+
+              <div className="relative">
+                <pre className="w-full p-4 bg-slate-900 text-slate-100 rounded-2xl text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto border border-slate-800">
+                  {selectedTemplateTab === 'sakit_ortu' &&
+`Tejakula, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+Kepada Yth.
+Bapak/Ibu Guru Mata Pelajaran PJOK
+SMA Negeri 1 Tejakula (SMANSAKA)
+di Tempat
+
+Dengan hormat,
+Saya yang bertanda tangan di bawah ini selaku orang tua/wali dari:
+
+Nama Siswa    : ${currentUser.name}
+NIS           : ${currentUser.nis || '.....................'}
+Kelas         : ${kelasNama}
+
+Dengan ini memberitahukan bahwa anak kami tersebut di atas tidak dapat mengikuti kegiatan pembelajaran PJOK pada hari ini, dikarenakan sedang mengalami SAKIT (demam/cedera fisik/kurang sehat).
+
+Saat ini anak kami sedang beristirahat di rumah. Apabila kondisi berlanjut, kami akan segera memeriksakan ke fasilitas kesehatan terdekat dan menyusulkan surat dokter.
+
+Demikian surat pemberitahuan ini kami sampaikan dengan sebenarnya. Atas perhatian dan izin dari Bapak/Ibu Guru PJOK, kami ucapkan terima kasih.
+
+Hormat kami,
+Orang Tua / Wali Murid,
+
+(Tanda Tangan Basah)
+[Nama Lengkap Orang Tua/Wali]`}
+
+                  {selectedTemplateTab === 'izin_ortu' &&
+`Tejakula, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+Kepada Yth.
+Bapak/Ibu Guru Mata Pelajaran PJOK
+SMA Negeri 1 Tejakula (SMANSAKA)
+di Tempat
+
+Dengan hormat,
+Saya yang bertanda tangan di bawah ini selaku orang tua/wali dari:
+
+Nama Siswa    : ${currentUser.name}
+NIS           : ${currentUser.nis || '.....................'}
+Kelas         : ${kelasNama}
+
+Dengan ini memohon izin bagi anak kami untuk tidak mengikuti pembelajaran PJOK pada tanggal ${tanggalMulai} dikarenakan ada keperluan keluarga mendesak / upacara adat keluarga yang tidak dapat ditinggalkan.
+
+Kami selaku orang tua memastikan anak kami akan tetap mengejar materi dan menyelesaikan tugas PJOK yang tertinggal.
+
+Demikian surat permohonan izin ini kami sampaikan. Atas izin dan kebijaksanaan Bapak/Ibu Guru, kami ucapkan terima kasih.
+
+Hormat kami,
+Orang Tua / Wali Murid,
+
+(Tanda Tangan Basah)
+[Nama Lengkap Orang Tua/Wali]`}
+
+                  {selectedTemplateTab === 'surat_dokter' &&
+`SYARAT KEABSAHAN SURAT KETERANGAN DOKTER:
+1. Memiliki KOP RESMI (Puskesmas Tejakula / Rumah Sakit / Klinik Dokter).
+2. Mencantumkan Nama Pasien: ${currentUser.name}.
+3. Terdapat keterangan anjuran istirahat (misal: istirahat selama 2-3 hari).
+4. Bertanda tangan dokter pemeriksa dan STEMPEL BASAH instansi medis.
+5. Difoto bersama orang tua/wali siswa sebagai bukti validasi.`}
+                </pre>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const textToCopy =
+                      selectedTemplateTab === 'sakit_ortu'
+                        ? `Tejakula, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\nKepada Yth.\nBapak/Ibu Guru Mata Pelajaran PJOK\nSMA Negeri 1 Tejakula (SMANSAKA)\ndi Tempat\n\nDengan hormat,\nSaya yang bertanda tangan di bawah ini selaku orang tua/wali dari:\n\nNama Siswa    : ${currentUser.name}\nNIS           : ${currentUser.nis || '.....................'}\nKelas         : ${kelasNama}\n\nDengan ini memberitahukan bahwa anak kami tersebut di atas tidak dapat mengikuti kegiatan pembelajaran PJOK pada hari ini, dikarenakan sedang mengalami SAKIT.\n\nSaat ini anak kami sedang beristirahat di rumah.\n\nDemikian surat pemberitahuan ini kami sampaikan dengan sebenarnya. Atas perhatian Bapak/Ibu Guru PJOK, kami ucapkan terima kasih.\n\nHormat kami,\nOrang Tua / Wali Murid,\n\n(Tanda Tangan Basah)\n[Nama Lengkap Orang Tua/Wali]`
+                        : selectedTemplateTab === 'izin_ortu'
+                        ? `Tejakula, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\nKepada Yth.\nBapak/Ibu Guru Mata Pelajaran PJOK\nSMA Negeri 1 Tejakula (SMANSAKA)\ndi Tempat\n\nDengan hormat,\nSaya yang bertanda tangan di bawah ini selaku orang tua/wali dari:\n\nNama Siswa    : ${currentUser.name}\nNIS           : ${currentUser.nis || '.....................'}\nKelas         : ${kelasNama}\n\nDengan ini memohon izin bagi anak kami untuk tidak mengikuti pembelajaran PJOK pada tanggal ${tanggalMulai} dikarenakan ada keperluan keluarga mendesak.\n\nDemikian permohonan ini kami buat, terima kasih.\n\nHormat kami,\nOrang Tua / Wali Murid,\n\n(Tanda Tangan Basah)\n[Nama Lengkap Orang Tua/Wali]`
+                        : `Surat Dokter Puskesmas / Klinik Resmi dengan tanda tangan & stempel basah.`;
+
+                    navigator.clipboard.writeText(textToCopy);
+                    setCopiedTemplate(true);
+                    setTimeout(() => setCopiedTemplate(false), 2500);
+                  }}
+                  className="absolute top-3 right-3 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold backdrop-blur-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  {copiedTemplate ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-300">Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin Format</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(false)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Tutup & Lanjutkan Mengisi
+              </button>
             </div>
           </div>
         </div>

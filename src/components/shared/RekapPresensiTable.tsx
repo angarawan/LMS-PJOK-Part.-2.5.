@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   Check,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { LMSDatabase, dataStorage } from '../../services/dataStorage';
 import { PresensiRecord, StatusPresensi, User, getTeacherAssignedClasses } from '../../types';
 
@@ -298,6 +299,46 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
     });
   };
 
+  // Export to Excel (.xlsx)
+  const handleExportXLSX = () => {
+    try {
+      const data = displayedStudents.map((m, idx) => {
+        const st = studentStats[m.id];
+        const rowData: Record<string, string | number> = {
+          'No': idx + 1,
+          'NIS': m.nis || '-',
+          'Nama Siswa': m.name,
+          'Kelas': selectedKelasObj?.nama || selectedKelasId,
+        };
+
+        filteredDates.forEach((d) => {
+          const item = attendanceLookup[`${m.id}_${d}`];
+          rowData[d] = item ? item.status : '-';
+        });
+
+        rowData['Hadir (H)'] = st?.totalH ?? 0;
+        rowData['Sakit (S)'] = st?.totalS ?? 0;
+        rowData['Izin (I)'] = st?.totalI ?? 0;
+        rowData['Alpa (A)'] = st?.totalA ?? 0;
+        rowData['Terlambat (T)'] = st?.totalT ?? 0;
+        rowData['Persentase Kehadiran (%)'] = `${st?.persenHadir ?? 0}%`;
+        rowData['Predikat Kedisiplinan'] = st?.predikat ?? '-';
+
+        return rowData;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Rekap Presensi');
+      XLSX.writeFile(
+        wb,
+        `Rekap_Presensi_PJOK_${selectedKelasObj?.nama || selectedKelasId}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
+    } catch (e) {
+      console.error('Error exporting Excel:', e);
+    }
+  };
+
   // Export to CSV
   const handleExportCSV = () => {
     const headers = [
@@ -427,9 +468,18 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
             )}
             <button
               type="button"
-              onClick={handleExportCSV}
+              onClick={handleExportXLSX}
               className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              title="Unduh Rekapitulasi Format Excel / CSV"
+              title="Unduh Rekapitulasi Format Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Ekspor Excel (.xlsx)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="px-3.5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Unduh Rekapitulasi Format CSV"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Ekspor CSV</span>
@@ -663,9 +713,9 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th className="py-3 px-3 w-10 text-center sticky left-0 bg-slate-50 z-20">No</th>
-                  <th className="py-3 px-3 w-28 sticky left-10 bg-slate-50 z-20">NIS</th>
-                  <th className="py-3 px-4 min-w-[180px] sticky left-38 bg-slate-50 z-20 shadow-xs">
+                  <th className="py-3 px-2 w-[44px] min-w-[44px] max-w-[44px] text-center sticky left-0 bg-slate-50 z-20">No</th>
+                  <th className="py-3 px-3 w-[100px] min-w-[100px] max-w-[100px] sticky left-[44px] bg-slate-50 z-20">NIS</th>
+                  <th className="py-3 px-4 w-[220px] min-w-[220px] max-w-[260px] sticky left-[144px] bg-slate-50 z-20 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] border-r-2 border-slate-300">
                     Nama Siswa
                   </th>
 
@@ -714,13 +764,13 @@ export const RekapPresensiTable: React.FC<RekapPresensiTableProps> = ({
                       className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                       onClick={() => setSelectedMuridDetail(m)}
                     >
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-400 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
+                      <td className="py-2.5 px-2 w-[44px] min-w-[44px] max-w-[44px] text-center font-bold text-slate-400 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
                         {idx + 1}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px] sticky left-10 bg-white group-hover:bg-slate-50 z-10">
+                      <td className="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] font-mono text-slate-500 text-[11px] sticky left-[44px] bg-white group-hover:bg-slate-50 z-10">
                         {m.nis || '-'}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-slate-800 sticky left-38 bg-white group-hover:bg-slate-50 z-10 shadow-xs truncate">
+                      <td className="py-2.5 px-4 w-[220px] min-w-[220px] max-w-[260px] font-bold text-slate-800 sticky left-[144px] bg-white group-hover:bg-slate-50 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] border-r-2 border-slate-300 truncate">
                         <div className="flex items-center gap-2">
                           <span className="truncate">{m.name}</span>
                           {st?.totalA > 0 && (

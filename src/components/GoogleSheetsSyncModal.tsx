@@ -85,6 +85,8 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
   const [autoSync, setAutoSync] = useState(
     activeSettings.autoSyncSpreadsheet ?? true
   );
+  const [showManualToken, setShowManualToken] = useState(false);
+  const [manualToken, setManualToken] = useState('');
 
   if (!isOpen) return null;
 
@@ -295,9 +297,6 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
       setIsLoading(false);
     }
   };
-
-  const [showManualToken, setShowManualToken] = useState(false);
-  const [manualToken, setManualToken] = useState('');
 
   const handleApplyManualToken = () => {
     if (!manualToken.trim()) {

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../types';
 import { dataStorage } from '../services/dataStorage';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 interface SidebarProps {
   role: UserRole;
@@ -331,6 +332,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         ))}
+
+        {/* Quick action: PWA Install in sidebar */}
+        <div className="px-4 mt-2">
+          <PWAInstallButton variant="banner" />
+        </div>
 
         {/* Quick action: Google Sheets in sidebar for Admin only */}
         {role === 'ADMIN' && onOpenGoogleSheets && (

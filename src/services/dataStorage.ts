@@ -956,7 +956,27 @@ class DataStorageService {
                 incoming.settings = { ...this.db.settings, ...s };
                 hasIncomingData = true;
               } else if (data && Array.isArray(data.items)) {
-                (incoming as any)[docId] = data.items;
+                if (docId === 'pengajuanIzin') {
+                  const serverItems: PengajuanIzin[] = data.items;
+                  const localItems: PengajuanIzin[] = Array.isArray(this.db.pengajuanIzin) ? this.db.pengajuanIzin : [];
+                  const map = new Map<string, PengajuanIzin>();
+                  serverItems.forEach((it) => map.set(it.id, it));
+                  localItems.forEach((it) => {
+                    if (!map.has(it.id)) map.set(it.id, it);
+                  });
+                  incoming.pengajuanIzin = Array.from(map.values());
+                } else if (docId === 'presensi') {
+                  const serverItems: PresensiRecord[] = data.items;
+                  const localItems: PresensiRecord[] = Array.isArray(this.db.presensi) ? this.db.presensi : [];
+                  const map = new Map<string, PresensiRecord>();
+                  serverItems.forEach((it) => map.set(it.id, it));
+                  localItems.forEach((it) => {
+                    if (!map.has(it.id)) map.set(it.id, it);
+                  });
+                  incoming.presensi = Array.from(map.values());
+                } else {
+                  (incoming as any)[docId] = data.items;
+                }
                 hasIncomingData = true;
               }
             });
@@ -1150,7 +1170,27 @@ class DataStorageService {
           if (docId === 'settings' && data?.data) {
             incoming.settings = data.data;
           } else if (data && Array.isArray(data.items)) {
-            (incoming as any)[docId] = data.items;
+            if (docId === 'pengajuanIzin') {
+              const serverItems: PengajuanIzin[] = data.items;
+              const localItems: PengajuanIzin[] = Array.isArray(this.db.pengajuanIzin) ? this.db.pengajuanIzin : [];
+              const map = new Map<string, PengajuanIzin>();
+              serverItems.forEach((it) => map.set(it.id, it));
+              localItems.forEach((it) => {
+                if (!map.has(it.id)) map.set(it.id, it);
+              });
+              incoming.pengajuanIzin = Array.from(map.values());
+            } else if (docId === 'presensi') {
+              const serverItems: PresensiRecord[] = data.items;
+              const localItems: PresensiRecord[] = Array.isArray(this.db.presensi) ? this.db.presensi : [];
+              const map = new Map<string, PresensiRecord>();
+              serverItems.forEach((it) => map.set(it.id, it));
+              localItems.forEach((it) => {
+                if (!map.has(it.id)) map.set(it.id, it);
+              });
+              incoming.presensi = Array.from(map.values());
+            } else {
+              (incoming as any)[docId] = data.items;
+            }
           }
         });
 
@@ -1361,7 +1401,24 @@ class DataStorageService {
           refleksi: Array.isArray(parsed?.refleksi) ? parsed.refleksi : INITIAL_DATABASE.refleksi,
           jawabanRefleksi: Array.isArray(parsed?.jawabanRefleksi) ? parsed.jawabanRefleksi : [],
           materiPraktikList: Array.isArray(parsed?.materiPraktikList) ? parsed.materiPraktikList : INITIAL_DATABASE.materiPraktikList,
-          pengajuanIzin: Array.isArray(parsed?.pengajuanIzin) ? parsed.pengajuanIzin : [],
+          pengajuanIzin: (() => {
+            let loadedPengajuan: PengajuanIzin[] = Array.isArray(parsed?.pengajuanIzin) ? parsed.pengajuanIzin : [];
+            try {
+              const backupStr = localStorage.getItem('lms_pengajuan_izin_backup');
+              if (backupStr) {
+                const backupItems: PengajuanIzin[] = JSON.parse(backupStr);
+                if (Array.isArray(backupItems) && backupItems.length > 0) {
+                  const map = new Map<string, PengajuanIzin>();
+                  loadedPengajuan.forEach((p) => map.set(p.id, p));
+                  backupItems.forEach((p) => map.set(p.id, p));
+                  loadedPengajuan = Array.from(map.values());
+                }
+              }
+            } catch (err) {
+              // ignore
+            }
+            return loadedPengajuan;
+          })(),
           isNilaiPresensiReset: parsed?.isNilaiPresensiReset ?? false,
         };
       }
@@ -1375,8 +1432,18 @@ class DataStorageService {
   private saveToLocalStorage(data: LMSDatabase) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      if (Array.isArray(data.pengajuanIzin) && data.pengajuanIzin.length > 0) {
+        localStorage.setItem('lms_pengajuan_izin_backup', JSON.stringify(data.pengajuanIzin));
+      }
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
+      try {
+        if (Array.isArray(data.pengajuanIzin)) {
+          localStorage.setItem('lms_pengajuan_izin_backup', JSON.stringify(data.pengajuanIzin));
+        }
+      } catch (err) {
+        // ignore
+      }
     }
   }
 

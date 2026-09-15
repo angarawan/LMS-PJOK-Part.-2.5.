@@ -20,6 +20,7 @@ import {
 import { User, PresensiRecord, PengajuanIzin } from '../../types';
 import { LMSDatabase } from '../../services/dataStorage';
 import { ModalAjukanIzin } from './ModalAjukanIzin';
+import { RekapPresensiTable } from '../shared/RekapPresensiTable';
 
 interface MuridPresensiProps {
   db: LMSDatabase;
@@ -27,7 +28,7 @@ interface MuridPresensiProps {
 }
 
 export const MuridPresensi: React.FC<MuridPresensiProps> = ({ db, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'presensi' | 'surat'>('presensi');
+  const [activeTab, setActiveTab] = useState<'presensi' | 'surat' | 'rekap-kelas'>('presensi');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
@@ -138,9 +139,29 @@ export const MuridPresensi: React.FC<MuridPresensiProps> = ({ db, currentUser })
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('rekap-kelas')}
+          className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer relative ${
+            activeTab === 'rekap-kelas'
+              ? 'bg-white text-indigo-950 shadow-xs ring-2 ring-indigo-500 font-black'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+          }`}
+        >
+          <CalendarCheck className="w-4 h-4 text-indigo-600" />
+          <span>Rekapan Absensi Kelas</span>
+        </button>
       </div>
 
-      {activeTab === 'presensi' ? (
+      {activeTab === 'rekap-kelas' ? (
+        <RekapPresensiTable
+          db={db}
+          selectedKelasId={currentUser.kelasId || (db.kelas && db.kelas[0]?.id) || 'cls-xi-1'}
+          onSelectKelasId={() => {}}
+          currentUser={currentUser}
+        />
+      ) : activeTab === 'presensi' ? (
         <>
           {/* Summary KPI */}
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">

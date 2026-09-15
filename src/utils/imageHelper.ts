@@ -83,7 +83,7 @@ export const processAvatarImageFile = (file: File): Promise<string> => {
  * for sharp readability of handwritten letters while keeping base64 under ~100-150KB.
  * Also supports PDF files by reading data URL directly.
  */
-export const processDocumentOrProofImage = (file: File, maxDim: number = 1280): Promise<string> => {
+export const processDocumentOrProofImage = (file: File, maxDim: number = 800): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file) {
       reject(new Error('Tidak ada file yang dipilih.'));
@@ -136,11 +136,11 @@ export const processDocumentOrProofImage = (file: File, maxDim: number = 1280): 
           }
 
           ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
+          ctx.imageSmoothingQuality = 'medium';
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Quality 0.82 ensures signatures & text remain sharp and legible
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          // Quality 0.72 keeps letters sharp while keeping size around 30-50KB
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
           resolve(dataUrl);
         } catch (e) {
           resolve(event.target?.result as string);

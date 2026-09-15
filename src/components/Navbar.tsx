@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { User, UserRole, PengaturanSekolah } from '../types';
 import { dataStorage, FirestoreSyncStatus } from '../services/dataStorage';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 interface NavbarProps {
   currentUser: User;
@@ -482,6 +483,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
         </div>
+
+        {/* PWA Install Button */}
+        <PWAInstallButton variant="compact" />
 
         {/* Google Sheets Sync Trigger - Admin Only */}
         {currentUser.role === 'ADMIN' && (

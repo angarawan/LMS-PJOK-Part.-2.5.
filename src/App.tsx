@@ -40,6 +40,7 @@ import { PraktikAssessment } from './components/shared/PraktikAssessment';
 import { ProfilMandiri } from './components/shared/ProfilMandiri';
 import { ProfilModal } from './components/shared/ProfilModal';
 import { LoginPage } from './components/LoginPage';
+import { PWAUpdatePrompt } from './components/pwa/PWAUpdatePrompt';
 
 export default function App() {
   const [db, setDb] = useState<LMSDatabase>(dataStorage.getDatabase());
@@ -412,6 +413,9 @@ export default function App() {
         db={db}
         onUpdateUser={handleUserUpdate}
       />
+
+      {/* PWA Update & Offline Notifications */}
+      <PWAUpdatePrompt />
     </div>
   );
 }

@@ -24,7 +24,12 @@ import {
   WrapText,
   SlidersHorizontal,
   FileText,
+  RefreshCw,
+  FileSpreadsheet,
+  Printer,
+  Download,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { PresensiRecord, StatusPresensi, User, UserRole, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
 import { RekapPresensiTable } from './RekapPresensiTable';
@@ -202,34 +207,140 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
   const [attendanceMap, setAttendanceMap] = useState<Record<string, StatusPresensi>>(getInitialStatus());
   const [keteranganMap, setKeteranganMap] = useState<Record<string, string>>(getInitialNotes());
 
-  // Sync attendance map when class or date changes
+  // Sync attendance map when class or date changes, automatically checking pengajuan izin
   useEffect(() => {
     const statusMap: Record<string, StatusPresensi> = {};
     const notesMap: Record<string, string> = {};
 
     muridInKelas.forEach((m) => {
+      // Check if student submitted leave / sick request covering this date
+      const izin = (db.pengajuanIzin || []).find((i) => {
+        if (i.muridId !== m.id) return false;
+        const start = i.tanggal;
+        const end = i.tanggalSelesai || i.tanggal;
+        return selectedTanggal >= start && selectedTanggal <= end;
+      });
+
       const existing = (db.presensi || []).find(
         (p) => p.muridId === m.id && p.tanggal === selectedTanggal
       );
-      const st = existing ? existing.status : 'H';
-      statusMap[m.id] = st;
 
-      if (existing && existing.keterangan && existing.keterangan !== 'Presensi Pembelajaran PJOK') {
-        notesMap[m.id] = existing.keterangan;
+      let st: StatusPresensi = 'H';
+      let note = '';
+
+      if (izin) {
+        st = izin.kategori === 'Sakit' ? 'S' : 'I';
+        const verifTag = izin.status === 'Disetujui' ? '(Disetujui)' : '(Pengajuan Murid)';
+        note = `Surat ${izin.kategori}: ${izin.alasan || ''} ${verifTag}`;
+      } else if (existing) {
+        st = existing.status;
+        note = existing.keterangan || DEFAULT_KETERANGAN[st];
       } else {
-        notesMap[m.id] = DEFAULT_KETERANGAN[st];
+        st = 'H';
+        note = DEFAULT_KETERANGAN['H'];
       }
+
+      statusMap[m.id] = st;
+      notesMap[m.id] = note;
     });
 
     setAttendanceMap(statusMap);
     setKeteranganMap(notesMap);
-  }, [selectedKelasId, selectedTanggal, muridInKelas, db.presensi]);
+  }, [selectedKelasId, selectedTanggal, muridInKelas, db.presensi, db.pengajuanIzin]);
 
   const showToast = (text: string, type: 'success' | 'info' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  const handleSyncIzinMurid = () => {
+    let syncedCount = 0;
+    const updatedStatus = { ...attendanceMap };
+    const updatedNotes = { ...keteranganMap };
+
+    muridInKelas.forEach((m) => {
+      const izin = (db.pengajuanIzin || []).find((i) => {
+        if (i.muridId !== m.id) return false;
+        const start = i.tanggal;
+        const end = i.tanggalSelesai || i.tanggal;
+        return selectedTanggal >= start && selectedTanggal <= end;
+      });
+
+      if (izin) {
+        const st: StatusPresensi = izin.kategori === 'Sakit' ? 'S' : 'I';
+        updatedStatus[m.id] = st;
+        const verifTag = izin.status === 'Disetujui' ? '(Disetujui)' : '(Pengajuan Murid)';
+        updatedNotes[m.id] = `Surat ${izin.kategori}: ${izin.alasan || ''} ${verifTag}`;
+        syncedCount++;
+      }
+    });
+
+    setAttendanceMap(updatedStatus);
+    setKeteranganMap(updatedNotes);
+    if (syncedCount > 0) {
+      showToast(`Berhasil menyinkronkan ${syncedCount} siswa yang memiliki surat izin/sakit!`, 'success');
+    } else {
+      showToast('Tidak ada pengajuan izin/sakit untuk tanggal ini.', 'info');
+    }
+  };
+
+  const handleExportPDF = () => {
+    window.print();
+  };
+
+  const handleExportExcel = () => {
+    try {
+      const dataToExport = filteredMurid.map((m, idx) => {
+        const st = attendanceMap[m.id] || 'H';
+        const ket = keteranganMap[m.id] || DEFAULT_KETERANGAN[st];
+        return {
+          'No': idx + 1,
+          'NIS': m.nis || '-',
+          'Nama Siswa': m.name,
+          'Kelas': selectedKelasObj?.nama || selectedKelasId,
+          'Tanggal': selectedTanggal,
+          'Status': st,
+          'Keterangan': ket,
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Presensi Harian');
+      XLSX.writeFile(wb, `Presensi_Kelas_${selectedKelasObj?.nama || selectedKelasId}_${selectedTanggal}.xlsx`);
+      showToast('Data presensi berhasil diexport ke file Excel (.xlsx)!', 'success');
+    } catch (e) {
+      showToast('Gagal mengekspor data ke Excel.', 'info');
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const headers = ['No', 'NIS', 'Nama Siswa', 'Kelas', 'Tanggal', 'Status', 'Keterangan'];
+      const rows = filteredMurid.map((m, idx) => [
+        idx + 1,
+        `"${m.nis || '-'}"`,
+        `"${m.name}"`,
+        `"${selectedKelasObj?.nama || selectedKelasId}"`,
+        `"${selectedTanggal}"`,
+        `"${attendanceMap[m.id] || 'H'}"`,
+        `"${(keteranganMap[m.id] || '').replace(/"/g, '""')}"`,
+      ]);
+
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Presensi_Kelas_${selectedKelasObj?.nama || selectedKelasId}_${selectedTanggal}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Data presensi berhasil diexport ke file CSV (.csv)!', 'success');
+    } catch (e) {
+      showToast('Gagal mengekspor data ke CSV.', 'info');
+    }
   };
 
   const handleChangeStatus = (muridId: string, status: StatusPresensi) => {
@@ -480,12 +591,39 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
           <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
             <button
               type="button"
+              onClick={handleSyncIzinMurid}
+              className="flex-1 sm:flex-none px-3 py-2 text-xs font-bold text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 border border-amber-400/30 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Sinkronkan otomatis absensi dari data pengajuan surat izin/sakit murid"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-300" />
+              <span>Sinkronkan Izin</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="flex-1 sm:flex-none px-3 py-2 text-xs font-bold text-emerald-200 bg-emerald-500/20 hover:bg-emerald-500/30 active:bg-emerald-500/40 border border-emerald-400/30 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+              title="Unduh rekap presensi hari ini dalam format Microsoft Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Excel (.xlsx)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="flex-1 sm:flex-none px-3 py-2 text-xs font-bold text-sky-200 bg-sky-500/20 hover:bg-sky-500/30 active:bg-sky-500/40 border border-sky-400/30 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+              title="Cetak atau simpan lembar absensi formal dalam format PDF"
+            >
+              <Printer className="w-3.5 h-3.5 text-sky-300" />
+              <span>Export PDF</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setShowResetAbsensiModal(true)}
               className="flex-1 sm:flex-none px-3 py-2 text-xs font-bold text-rose-200 bg-rose-500/20 hover:bg-rose-500/30 active:bg-rose-500/40 border border-rose-400/30 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
               title="Kosongkan riwayat absensi untuk mulai dari nol"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset ke Nol</span>
+              <span>Reset</span>
             </button>
             <button
               type="button"
@@ -493,7 +631,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({
               className="flex-1 sm:flex-none px-3 py-2 text-xs font-bold text-blue-100 bg-white/10 hover:bg-white/20 active:bg-white/30 border border-white/20 rounded-xl transition text-center cursor-pointer"
               title="Setel semua siswa menjadi Hadir (H)"
             >
-              Semua Hadir (H)
+              Semua H
             </button>
             <button
               type="button"
