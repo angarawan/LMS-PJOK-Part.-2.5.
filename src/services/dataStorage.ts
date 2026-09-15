@@ -19,6 +19,7 @@ import {
   JawabanRefleksiMurid,
   SoalRefleksi,
   PengajuanIzin,
+  Pengumuman,
 } from '../types';
 import {
   collection,
@@ -61,6 +62,7 @@ export interface LMSDatabase {
   nilai: RekapNilaiMurid[];
   settings: PengaturanSekolah;
   pengajuanIzin?: PengajuanIzin[];
+  pengumuman?: Pengumuman[];
   refleksi?: RefleksiPembelajaran[];
   jawabanRefleksi?: JawabanRefleksiMurid[];
   materiPraktikList?: string[];
@@ -779,6 +781,30 @@ Zona Latihan Efektif: 65% - 85% dari DNM.`,
     'Atletik - Lari Cepat & Estafet',
   ],
   pengajuanIzin: [],
+  pengumuman: [
+    {
+      id: 'ann-init-1',
+      judul: 'Pelaksanaan Asesmen Keterampilan Gerak Bola Voli & Senam Irama Fase F',
+      konten: 'Diumumkan kepada seluruh peserta didik kelas XI Fase F bahwa asesmen unjuk kerja keterampilan gerak passing bola voli dan rangkaian senam irama akan dilaksanakan pekan depan sesuai jadwal jam pelajaran PJOK. Harap mengenakan seragam olahraga resmi sekolah.',
+      kategori: 'Penting',
+      guruId: 'usr-guru-1',
+      guruNama: 'I Ketut Sukadana, S.Pd',
+      targetKelasIds: ['all'],
+      dibuatPada: '2026-09-14T08:00:00.000Z',
+      disematkan: true,
+    },
+    {
+      id: 'ann-init-2',
+      judul: 'Materi Digital Baru: Kebugaran Jasmani & Latihan Sirkuit Mandiri',
+      konten: 'Modul digital kebugaran jasmani dan video latihan sirkuit training mandiri telah diunggah di menu Materi Belajar. Silakan dipelajari dan disimak materi intinya sebelum kegiatan praktik lapangan.',
+      kategori: 'Materi',
+      guruId: 'usr-guru-1',
+      guruNama: 'I Ketut Sukadana, S.Pd',
+      targetKelasIds: ['all'],
+      dibuatPada: '2026-09-12T09:30:00.000Z',
+      disematkan: false,
+    },
+  ],
 };
 
 export type FirestoreSyncStatus = 'connecting' | 'synced' | 'syncing' | 'offline' | 'error';
@@ -1051,6 +1077,7 @@ class DataStorageService {
         'jawabanRefleksi',
         'materiPraktikList',
         'pengajuanIzin',
+        'pengumuman',
       ];
 
       for (const sec of sections) {
@@ -1106,6 +1133,7 @@ class DataStorageService {
         'jawabanRefleksi',
         'materiPraktikList',
         'pengajuanIzin',
+        'pengumuman',
       ];
 
       const changedSections = sections.filter((sec) => prev[sec] !== next[sec]);
@@ -1420,6 +1448,7 @@ class DataStorageService {
             return loadedPengajuan;
           })(),
           isNilaiPresensiReset: parsed?.isNilaiPresensiReset ?? false,
+          pengumuman: Array.isArray(parsed?.pengumuman) ? parsed.pengumuman : (isCleanSlate ? [] : INITIAL_DATABASE.pengumuman),
         };
       }
     } catch (e) {

@@ -26,12 +26,14 @@ export interface Kelas {
   id: string;
   nama: string; // e.g., "XI 1", "XI 2", "X 1", "XII 1"
   tingkat: 'X' | 'XI' | 'XII';
-  waliKelasId: string;
-  waliKelasNama: string;
-  guruPengampuId: string;
-  guruPengampuNama: string;
-  tahunPelajaran: string;
-  totalMurid: number;
+  waliKelasId?: string;
+  waliKelasNama?: string;
+  guruPengampuId?: string;
+  guruPengampuNama?: string;
+  tahunPelajaran?: string;
+  totalMurid?: number;
+  jurusan?: string;
+  jumlahSiswa?: number;
 }
 
 export interface MataPelajaran {
@@ -56,7 +58,10 @@ export interface Materi {
   semester?: '1' | '2';
   tujuanPembelajaran?: string; // Capaian dan Tujuan Pembelajaran (paling di atas)
   deskripsi: string; // Uraian Materi & Konsep Gerak
+  labelBagian2?: string; // Judul sub menu 2 yang diketik manual (default: Uraian Materi & Konsep Gerak)
   materiInti?: string; // Materi Inti (penjelasan mendalam & tahapan gerak)
+  labelBagian3?: string; // Judul sub menu 3 yang diketik manual (default: Materi Inti & Panduan Gerak)
+  textAlignment?: 'justify' | 'left' | 'center' | 'right';
   kontenTeks?: string; // Dukungan teks konten tambahan / alias
   konten?: string;
   subMateriList?: {
@@ -498,5 +503,23 @@ export function getTeacherAssignedClasses(teacher: User | null | undefined, allK
 
   // 4. Fallback: if no specific class is assigned yet, return all classes so teacher can still operate
   return allKelas;
+}
+
+export interface Pengumuman {
+  id: string;
+  judul: string;
+  isi?: string;
+  konten?: string;
+  tanggal?: string;
+  guruId: string;
+  guruNama: string;
+  targetKelasIds?: string[];
+  targetKelasId?: string; // 'ALL' or specific class ID
+  targetKelasNama?: string;
+  kategori?: string;
+  prioritas?: 'Tinggi' | 'Normal';
+  lampiranLink?: string;
+  dibuatPada: string;
+  disematkan?: boolean;
 }
 

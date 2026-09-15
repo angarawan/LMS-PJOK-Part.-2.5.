@@ -317,31 +317,69 @@ export const parseCSVToUsers = (csvText: string): User[] => {
     } else {
       // Murid
       user.nis = nipOrNis || undefined;
-      user.kelasId = 'cls-xi-1';
-      user.tahunPelajaran = '2026/2027';
-      // Detect gender guess from name
-      const lowerName = name.toLowerCase();
-      if (
-        lowerName.includes('ni ') ||
-        lowerName.includes('putu ') ||
-        lowerName.includes('dewi') ||
-        lowerName.includes('ayu') ||
-        lowerName.includes('luh ') ||
-        lowerName.includes('komang ayu') ||
-        lowerName.includes('savitri') ||
-        lowerName.includes('purwani') ||
-        lowerName.includes('caitanya') ||
-        lowerName.includes('febriana') ||
-        lowerName.includes('vitare') ||
-        lowerName.includes('sinthya') ||
-        lowerName.includes('cintya') ||
-        lowerName.includes('sinta') ||
-        lowerName.includes('nadine') ||
-        lowerName.includes('ida ayu')
-      ) {
-        user.jenisKelamin = 'P';
+
+      // Baca kolom kelas dari CSV
+      const rawKelas = getCol(row, ['kelas', 'kelasid', 'rombel', 'kelas_id', 'tingkat', 'nama_kelas', 'kelassiswa']);
+      if (rawKelas) {
+        const cleaned = rawKelas.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+        if (cleaned.startsWith('cls-')) {
+          user.kelasId = cleaned;
+        } else if (cleaned.includes('xi-1') || cleaned === 'xi1' || cleaned === '11-1' || cleaned === '111') {
+          user.kelasId = 'cls-xi-1';
+        } else if (cleaned.includes('xi-2') || cleaned === 'xi2' || cleaned === '11-2' || cleaned === '112') {
+          user.kelasId = 'cls-xi-2';
+        } else if (cleaned.includes('xi-3') || cleaned === 'xi3' || cleaned === '11-3' || cleaned === '113') {
+          user.kelasId = 'cls-xi-3';
+        } else if (cleaned.includes('xi-4') || cleaned === 'xi4' || cleaned === '11-4' || cleaned === '114') {
+          user.kelasId = 'cls-xi-4';
+        } else if (cleaned.includes('xi-5') || cleaned === 'xi5' || cleaned === '11-5' || cleaned === '115') {
+          user.kelasId = 'cls-xi-5';
+        } else if (cleaned.includes('xi-6') || cleaned === 'xi6' || cleaned === '11-6' || cleaned === '116') {
+          user.kelasId = 'cls-xi-6';
+        } else if (cleaned.includes('xi-7') || cleaned === 'xi7' || cleaned === '11-7' || cleaned === '117') {
+          user.kelasId = 'cls-xi-7';
+        } else if (cleaned.includes('x-') || cleaned.startsWith('x') || cleaned.includes('10')) {
+          user.kelasId = `cls-${cleaned}`;
+        } else {
+          user.kelasId = `cls-${cleaned}`;
+        }
       } else {
+        user.kelasId = 'cls-xi-1';
+      }
+
+      user.tahunPelajaran = '2026/2027';
+
+      // Baca jenis kelamin jika ada di CSV
+      const rawJk = getCol(row, ['jk', 'jeniskelamin', 'gender', 'kelamin', 'sex']).toUpperCase();
+      if (rawJk.startsWith('P') || rawJk.includes('PEREMPUAN') || rawJk.includes('FEMALE')) {
+        user.jenisKelamin = 'P';
+      } else if (rawJk.startsWith('L') || rawJk.includes('LAKI') || rawJk.includes('MALE')) {
         user.jenisKelamin = 'L';
+      } else {
+        // Detect gender guess from name
+        const lowerName = name.toLowerCase();
+        if (
+          lowerName.includes('ni ') ||
+          lowerName.includes('putu ') ||
+          lowerName.includes('dewi') ||
+          lowerName.includes('ayu') ||
+          lowerName.includes('luh ') ||
+          lowerName.includes('komang ayu') ||
+          lowerName.includes('savitri') ||
+          lowerName.includes('purwani') ||
+          lowerName.includes('caitanya') ||
+          lowerName.includes('febriana') ||
+          lowerName.includes('vitare') ||
+          lowerName.includes('sinthya') ||
+          lowerName.includes('cintya') ||
+          lowerName.includes('sinta') ||
+          lowerName.includes('nadine') ||
+          lowerName.includes('ida ayu')
+        ) {
+          user.jenisKelamin = 'P';
+        } else {
+          user.jenisKelamin = 'L';
+        }
       }
     }
 

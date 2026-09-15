@@ -12,6 +12,7 @@ import {
   Upload,
   Layers,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { User as UserType, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
@@ -49,6 +50,8 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeMuridDetail, setActiveMuridDetail] = useState<UserType | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [studentToDelete, setStudentToDelete] = useState<UserType | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const selectedKelasObj = (db.kelas || []).find((k) => k.id === selectedKelasId);
 
@@ -91,29 +94,103 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
 
   const handleImportMurid = (imported: any[]) => {
     if (!imported || imported.length === 0) return;
-    const targetKelasId = selectedKelasId || 'cls-xi-1';
-    const newUsers: UserType[] = imported.map((row, idx) => ({
-      id: row.id || `usr-imp-${Date.now()}-${idx}`,
-      username: row.username || (row.nis ? `siswa_${row.nis}` : `siswa_${Date.now()}_${idx}`),
-      name: row.name || row.nama || `Siswa Baru ${idx + 1}`,
-      role: 'MURID',
-      nis: row.nis || '',
-      nisn: row.nisn || '',
-      kelasId: row.kelasId || targetKelasId,
-      jenisKelamin: (row.jenisKelamin || 'L').toUpperCase().startsWith('P') ? 'P' : 'L',
-      status: 'Aktif',
-      tahunPelajaran: db.settings?.tahunPelajaran || '2026/2027',
-    }));
+    const defaultKelasId = selectedKelasId !== 'all' ? selectedKelasId : (visibleClasses[0]?.id || 'cls-xi-1');
+    
+    const newUsers: UserType[] = imported.map((row, idx) => {
+      // Ensure kelasId is resolved properly
+      let assignedKelasId = row.kelasId;
+      if (!assignedKelasId || assignedKelasId === 'all') {
+        assignedKelasId = defaultKelasId;
+      }
+
+      return {
+        id: row.id || `usr-imp-${Date.now()}-${idx}`,
+        username: row.username || (row.nis ? `siswa_${row.nis}` : `siswa_${Date.now()}_${idx}`),
+        name: row.name || row.nama || `Siswa Baru ${idx + 1}`,
+        role: 'MURID',
+        nis: row.nis || '',
+        nisn: row.nisn || '',
+        kelasId: assignedKelasId,
+        jenisKelamin: (row.jenisKelamin || 'L').toUpperCase().startsWith('P') ? 'P' : 'L',
+        status: 'Aktif',
+        tahunPelajaran: db.settings?.tahunPelajaran || '2026/2027',
+      };
+    });
+
+    dataStorage.updateDatabase((prev) => {
+      const existingKelasIds = new Set((prev.kelas || []).map((k) => k.id.toLowerCase()));
+      const newKelasList = [...(prev.kelas || [])];
+
+      newUsers.forEach((u) => {
+        if (u.kelasId) {
+          const kIdLower = u.kelasId.toLowerCase();
+          if (!existingKelasIds.has(kIdLower)) {
+            existingKelasIds.add(kIdLower);
+            const formatName = u.kelasId.replace(/^cls-/, '').toUpperCase().replace(/-/g, ' ');
+            newKelasList.push({
+              id: u.kelasId,
+              nama: formatName.startsWith('XI') ? formatName : `XI ${formatName}`,
+              tingkat: 'XI',
+              jurusan: 'Fase F',
+              jumlahSiswa: 1,
+              guruPengampuNama: currentUser?.name || 'I Ketut Sukadana, S.Pd',
+            });
+          }
+        }
+      });
+
+      return {
+        ...prev,
+        users: [...prev.users, ...newUsers],
+        kelas: newKelasList,
+      };
+    });
+    setToastMsg(`Berhasil mengimpor ${newUsers.length} data murid baru.`);
+    setTimeout(() => setToastMsg(null), 3500);
+    setIsUploadModalOpen(false);
+  };
+
+  const handleConfirmDeleteStudent = () => {
+    if (!studentToDelete) return;
+    const sId = studentToDelete.id;
+    const sName = studentToDelete.name;
 
     dataStorage.updateDatabase((prev) => ({
       ...prev,
-      users: [...prev.users, ...newUsers],
+      users: prev.users.filter((u) => u.id !== sId),
+      presensi: (prev.presensi || []).filter((p) => p.muridId !== sId),
+      nilai: (prev.nilai || []).filter((n) => n.muridId !== sId),
+      pengumpulanTugas: (prev.pengumpulanTugas || []).filter((t) => t.muridId !== sId),
+      jawabanQuiz: (prev.jawabanQuiz || []).filter((q) => q.muridId !== sId),
     }));
-    setIsUploadModalOpen(false);
+
+    if (activeMuridDetail?.id === sId) {
+      setActiveMuridDetail(null);
+    }
+    setStudentToDelete(null);
+    setToastMsg(`Data murid ${sName} berhasil dihapus dari sistem.`);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   return (
     <div className="space-y-6">
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{toastMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-[11px] font-bold"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -259,15 +336,25 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
               </div>
 
               <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                <button
-                  onClick={() => setActiveMuridDetail(murid)}
-                  className="text-xs text-slate-600 hover:text-slate-900 font-bold"
-                >
-                  Detail Profil
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveMuridDetail(murid)}
+                    className="text-xs text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                  >
+                    Detail Profil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStudentToDelete(murid)}
+                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Hapus Data Siswa"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <button
                   onClick={() => onNavigatePraktik(murid.id)}
-                  className="px-3 py-1.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1"
+                  className="px-3 py-1.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <Activity className="w-3.5 h-3.5" /> Nilai Praktik
                 </button>
@@ -352,12 +439,52 @@ export const GuruDataMurid: React.FC<GuruDataMuridProps> = ({ db, currentUser, o
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(activeMuridDetail)}
+                className="px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Hapus
+              </button>
               <button
                 onClick={() => setActiveMuridDetail(null)}
-                className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition-colors"
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Tutup Profil Siswa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Student Deletion */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-2xs p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-extrabold text-slate-900">Hapus Data Murid?</h3>
+              <p className="text-xs text-slate-500">
+                Apakah Anda yakin ingin menghapus data murid <span className="font-bold text-slate-800">{studentToDelete.name}</span> (NIS: {studentToDelete.nis})? Semua nilai, presensi, dan riwayat tugas terkait murid ini juga akan dihapus.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStudent}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                Ya, Hapus
               </button>
             </div>
           </div>

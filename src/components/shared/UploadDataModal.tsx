@@ -78,47 +78,93 @@ export const UploadDataModal: React.FC<UploadDataModalProps> = ({
         return;
       }
 
+      // Dynamic header mapping
+      const headerMap: Record<string, number> = {};
+      headers.forEach((h, idx) => {
+        const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+        headerMap[cleanH] = idx;
+      });
+
+      const getVal = (row: string[], keys: string[], defaultIdx: number): string => {
+        for (const k of keys) {
+          const idx = headerMap[k];
+          if (idx !== undefined && row[idx] !== undefined) {
+            return row[idx].trim();
+          }
+        }
+        return row[defaultIdx] !== undefined ? row[defaultIdx].trim() : '';
+      };
+
       const parsed: any[] = [];
 
       if (type === 'materi') {
         dataRows.forEach((r, idx) => {
-          if (!r[0]) return;
+          const judul = getVal(r, ['judul', 'title', 'namamateri'], 0);
+          if (!judul) return;
           parsed.push({
             id: `mat-imp-${Date.now()}-${idx}`,
-            judul: r[0] || 'Materi PJOK Baru',
-            kategori: r[1] || 'PJOK Fase F',
-            tujuanPembelajaran: r[2] || '',
-            deskripsi: r[3] || '',
-            materiInti: r[4] || '',
-            videoUrl: r[5] || '',
-            fileUrl: r[6] || '',
+            judul,
+            kategori: getVal(r, ['kategori', 'category'], 1) || 'PJOK Fase F',
+            tujuanPembelajaran: getVal(r, ['tujuanpembelajaran', 'tujuan', 'tp'], 2) || '',
+            deskripsi: getVal(r, ['deskripsi', 'uraian'], 3) || '',
+            materiInti: getVal(r, ['materiinti', 'konten', 'isi'], 4) || '',
+            videoUrl: getVal(r, ['videourl', 'video'], 5) || '',
+            fileUrl: getVal(r, ['fileurl', 'file', 'modul'], 6) || '',
             status: 'Publish',
             dibuatPada: new Date().toISOString().slice(0, 10),
           });
         });
       } else if (type === 'tugas') {
         dataRows.forEach((r, idx) => {
-          if (!r[0]) return;
+          const judul = getVal(r, ['judul', 'judultugas', 'nama'], 0);
+          if (!judul) return;
+          const klsTarget = getVal(r, ['kelastarget', 'kelas', 'kelasids'], 4);
           parsed.push({
             id: `tug-imp-${Date.now()}-${idx}`,
-            judul: r[0] || 'Tugas Baru',
-            kategori: r[1] || 'Praktik Gerak Mandiri',
-            instruksi: r[2] || '',
-            deadline: r[3] || '2026-09-30T23:59',
-            kelasIds: r[4] && r[4] !== 'Semua' ? [r[4]] : ['cls-xi-1', 'cls-xi-2', 'cls-xi-3'],
+            judul,
+            kategori: getVal(r, ['kategori'], 1) || 'Praktik Gerak Mandiri',
+            instruksi: getVal(r, ['instruksi', 'petunjuk'], 2) || '',
+            deadline: getVal(r, ['deadline', 'bataswaktu'], 3) || '2026-09-30T23:59',
+            kelasIds: klsTarget && klsTarget !== 'Semua' ? [klsTarget] : ['cls-xi-1', 'cls-xi-2', 'cls-xi-3'],
             status: 'Publish',
             dibuatPada: new Date().toISOString().slice(0, 10),
           });
         });
       } else if (type === 'murid') {
         dataRows.forEach((r, idx) => {
-          if (!r[1]) return;
-          const nis = r[0] || `24${String(Date.now()).slice(-4)}${idx}`;
-          const name = r[1];
-          const kelasId = r[2]?.startsWith('cls-') ? r[2] : 'cls-xi-1';
-          const jk = r[3]?.toUpperCase() === 'P' ? 'P' : 'L';
-          const email = r[4] || `${name.toLowerCase().replace(/\s+/g, '.')}@siswa.sch.id`;
-          const username = r[5] || name.toLowerCase().replace(/\s+/g, '');
+          const name = getVal(r, ['name', 'nama', 'namalengkap', 'namamurid', 'namasiswa'], 1);
+          if (!name) return;
+          const nis = getVal(r, ['nis', 'nisn', 'nomorinduk', 'noinduk'], 0) || `24${String(Date.now()).slice(-4)}${idx}`;
+          const rawKls = getVal(r, ['kelasid', 'kelas', 'rombel', 'nama_kelas', 'kelassiswa', 'tingkat'], 2);
+          
+          let kelasId = 'cls-xi-1';
+          if (rawKls) {
+            const cln = rawKls.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+            if (cln.startsWith('cls-')) {
+              kelasId = cln;
+            } else if (cln.includes('xi-1') || cln === 'xi1' || cln === '11-1' || cln === '111' || cln.includes('fasef1')) {
+              kelasId = 'cls-xi-1';
+            } else if (cln.includes('xi-2') || cln === 'xi2' || cln === '11-2' || cln === '112' || cln.includes('fasef2')) {
+              kelasId = 'cls-xi-2';
+            } else if (cln.includes('xi-3') || cln === 'xi3' || cln === '11-3' || cln === '113' || cln.includes('fasef3')) {
+              kelasId = 'cls-xi-3';
+            } else if (cln.includes('xi-4') || cln === 'xi4' || cln === '11-4' || cln === '114' || cln.includes('fasef4')) {
+              kelasId = 'cls-xi-4';
+            } else if (cln.includes('xi-5') || cln === 'xi5' || cln === '11-5' || cln === '115' || cln.includes('fasef5')) {
+              kelasId = 'cls-xi-5';
+            } else if (cln.includes('xi-6') || cln === 'xi6' || cln === '11-6' || cln === '116' || cln.includes('fasef6')) {
+              kelasId = 'cls-xi-6';
+            } else if (cln.includes('xi-7') || cln === 'xi7' || cln === '11-7' || cln === '117' || cln.includes('fasef7')) {
+              kelasId = 'cls-xi-7';
+            } else {
+              kelasId = `cls-${cln}`;
+            }
+          }
+          
+          const rawJk = getVal(r, ['jeniskelamin', 'jk', 'gender', 'kelamin'], 3);
+          const jk = rawJk.toUpperCase().startsWith('P') ? 'P' : 'L';
+          const email = getVal(r, ['email', 'surel'], 4) || `${name.toLowerCase().replace(/\s+/g, '.')}@siswa.sch.id`;
+          const username = getVal(r, ['username', 'user'], 5) || (nis ? `siswa_${nis}` : name.toLowerCase().replace(/\s+/g, ''));
 
           parsed.push({
             id: `usr-murid-imp-${Date.now()}-${idx}`,
@@ -129,7 +175,7 @@ export const UploadDataModal: React.FC<UploadDataModalProps> = ({
             kelasId,
             jenisKelamin: jk,
             email,
-            avatar: `https://images.unsplash.com/photo-${1535713875002 + idx}?w=120&auto=format&fit=crop&q=80`,
+            avatar: `https://images.unsplash.com/photo-${1535713875002 + (idx % 10)}?w=120&auto=format&fit=crop&q=80`,
           });
         });
       } else if (type === 'bankSoal') {

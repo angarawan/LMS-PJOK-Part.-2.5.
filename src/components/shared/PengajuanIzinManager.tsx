@@ -58,6 +58,8 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
   // Reject Modal
   const [rejectModalItem, setRejectModalItem] = useState<PengajuanIzin | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const rawList: PengajuanIzin[] = Array.isArray(db.pengajuanIzin) ? db.pengajuanIzin : [];
 
@@ -109,10 +111,6 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
 
   const handleApprove = (item: PengajuanIzin) => {
     const defaultStatusPresensi = item.kategori === 'Sakit' ? 'S' : 'I';
-    const konfirmasi = window.confirm(
-      `Setujui surat permohonan ${item.kategori} dari ${item.muridNama} untuk tanggal ${item.tanggal}? Presensi siswa pada tanggal tersebut akan otomatis dicatat sebagai ${defaultStatusPresensi === 'S' ? 'Sakit (S)' : 'Izin (I)'}.`
-    );
-    if (!konfirmasi) return;
 
     dataStorage.updateDatabase((prev) => {
       // 1. Update status pengajuan
@@ -121,7 +119,7 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
           return {
             ...p,
             status: 'Disetujui' as StatusPengajuanIzin,
-            diverifikasiOleh: currentUser.name,
+            diverifikasiOleh: currentUser?.name || 'Guru PJOK',
             tanggalVerifikasi: new Date().toISOString(),
           };
         }
@@ -142,9 +140,9 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
           kelasNama: item.kelasNama || 'Kelas Siswa',
           tanggal: item.tanggal,
           status: defaultStatusPresensi,
-          keterangan: `${item.kategori}: ${item.alasan} (Surat Disetujui oleh ${currentUser.name})`,
-          guruId: currentUser.id,
-          guruNama: currentUser.name,
+          keterangan: `${item.kategori}: ${item.alasan} (Surat Disetujui oleh ${currentUser?.name || 'Guru PJOK'})`,
+          guruId: currentUser?.id || 'guru-1',
+          guruNama: currentUser?.name || 'Guru PJOK',
         },
       ];
 
@@ -152,7 +150,7 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
       const notifItem: NotifikasiItem = {
         id: `notif-acc-${Date.now()}`,
         judul: `Surat ${item.kategori} Disetujui`,
-        pesan: `Permohonan surat ${item.kategori.toLowerCase()} untuk tanggal ${item.tanggal} telah diverifikasi dan disetujui oleh ${currentUser.name}.`,
+        pesan: `Permohonan surat ${item.kategori.toLowerCase()} untuk tanggal ${item.tanggal} telah diverifikasi dan disetujui oleh ${currentUser?.name || 'Guru PJOK'}. Presensi siswa otomatis dicatat ${defaultStatusPresensi === 'S' ? 'Sakit (S)' : 'Izin (I)'}.`,
         waktu: 'Baru saja',
         tipe: 'presensi',
         dibaca: false,
@@ -165,6 +163,9 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
         notifikasi: [notifItem, ...(prev.notifikasi || [])],
       };
     });
+
+    setToastMsg(`Surat ${item.kategori} dari ${item.muridNama} berhasil disetujui dan dicatat pada presensi (${defaultStatusPresensi === 'S' ? 'Sakit' : 'Izin'})!`);
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
   const handleOpenRejectModal = (item: PengajuanIzin) => {
@@ -184,7 +185,7 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
             ...p,
             status: 'Ditolak' as StatusPengajuanIzin,
             catatanGuru: catatan,
-            diverifikasiOleh: currentUser.name,
+            diverifikasiOleh: currentUser?.name || 'Guru PJOK',
             tanggalVerifikasi: new Date().toISOString(),
           };
         }
@@ -194,7 +195,7 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
       const notifItem: NotifikasiItem = {
         id: `notif-rej-${Date.now()}`,
         judul: `Surat ${rejectModalItem.kategori} Ditolak`,
-        pesan: `Permohonan surat ${rejectModalItem.kategori.toLowerCase()} untuk tanggal ${rejectModalItem.tanggal} ditolak oleh ${currentUser.name}. Catatan: "${catatan}"`,
+        pesan: `Permohonan surat ${rejectModalItem.kategori.toLowerCase()} untuk tanggal ${rejectModalItem.tanggal} ditolak oleh ${currentUser?.name || 'Guru PJOK'}. Catatan: "${catatan}"`,
         waktu: 'Baru saja',
         tipe: 'presensi',
         dibaca: false,
@@ -207,15 +208,24 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
       };
     });
 
+    setToastMsg(`Surat ${rejectModalItem.kategori} dari ${rejectModalItem.muridNama} ditolak.`);
+    setTimeout(() => setToastMsg(null), 4000);
     setRejectModalItem(null);
   };
 
   const handleDeleteItem = (id: string) => {
-    if (!window.confirm('Hapus arsip permohonan surat izin ini secara permanen?')) return;
+    setItemToDelete(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!itemToDelete) return;
     dataStorage.updateDatabase((prev) => ({
       ...prev,
-      pengajuanIzin: (prev.pengajuanIzin || []).filter((i) => i.id !== id),
+      pengajuanIzin: (prev.pengajuanIzin || []).filter((i) => i.id !== itemToDelete),
     }));
+    setItemToDelete(null);
+    setToastMsg('Arsip surat permohonan berhasil dihapus.');
+    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const getCleanWaNumber = (phoneStr: string) => {
@@ -228,6 +238,23 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{toastMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-[11px] font-bold"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* KPI Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
@@ -730,6 +757,39 @@ export const PengajuanIzinManager: React.FC<PengajuanIzinManagerProps> = ({
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
               >
                 Konfirmasi Tolak Surat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Item Confirmation Modal */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-2xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-black text-slate-800">Hapus Arsip Permohonan?</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Data arsip surat ini akan dihapus secara permanen dari sistem presensi.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+              >
+                Ya, Hapus
               </button>
             </div>
           </div>

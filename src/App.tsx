@@ -18,6 +18,7 @@ import { GuruDashboard } from './components/guru/GuruDashboard';
 import { GuruDataMurid } from './components/guru/GuruDataMurid';
 import { JurnalMengajarView } from './components/guru/JurnalMengajar';
 import { GuruRefleksi } from './components/guru/GuruRefleksi';
+import { GuruPengumuman } from './components/guru/GuruPengumuman';
 
 // Student Components
 import { MuridDashboard } from './components/murid/MuridDashboard';
@@ -28,6 +29,7 @@ import { MuridNilai } from './components/murid/MuridNilai';
 import { MuridPresensi } from './components/murid/MuridPresensi';
 import { MuridProfil } from './components/murid/MuridProfil';
 import { MuridRefleksi } from './components/murid/MuridRefleksi';
+import { MuridPengumumanView } from './components/murid/MuridPengumumanView';
 
 // Shared Components
 import { MateriManager } from './components/shared/MateriManager';
@@ -35,6 +37,7 @@ import { TugasManager } from './components/shared/TugasManager';
 import { QuizManager } from './components/shared/QuizManager';
 import { ContentManager } from './components/shared/ContentManager';
 import { AttendanceManager } from './components/shared/AttendanceManager';
+import { PengajuanIzinManager } from './components/shared/PengajuanIzinManager';
 import { GradesReport } from './components/shared/GradesReport';
 import { PraktikAssessment } from './components/shared/PraktikAssessment';
 import { ProfilMandiri } from './components/shared/ProfilMandiri';
@@ -172,7 +175,13 @@ export default function App() {
         case 'refleksi':
           return <GuruRefleksi db={db} currentUser={currentUser} />;
         case 'jurnal':
-          return <JurnalMengajarView db={db} currentUser={currentUser} />;
+          return <JurnalMengajarView db={db} currentUser={currentUser} initialTab="agenda" />;
+        case 'rekap-jurnal':
+          return <JurnalMengajarView db={db} currentUser={currentUser} initialTab="rekap" />;
+        case 'pengumuman':
+          return <GuruPengumuman db={db} currentUser={currentUser} />;
+        case 'pengajuan-izin':
+          return <PengajuanIzinManager db={db} currentUser={currentUser} selectedKelasId="ALL" />;
         case 'presensi':
           return <AttendanceManager db={db} role="ADMIN" currentUser={currentUser} initialTab="harian" />;
         case 'rekap-absensi':
@@ -233,6 +242,10 @@ export default function App() {
           return <GuruRefleksi db={db} currentUser={currentUser} />;
         case 'presensi':
           return <AttendanceManager db={db} role="GURU" currentUser={currentUser} initialTab="harian" />;
+        case 'pengajuan-izin':
+          return <PengajuanIzinManager db={db} currentUser={currentUser} selectedKelasId="ALL" />;
+        case 'pengumuman':
+          return <GuruPengumuman db={db} currentUser={currentUser} />;
         case 'rekap-absensi':
           return <AttendanceManager db={db} role="GURU" currentUser={currentUser} initialTab="rekap" />;
         case 'nilai':
@@ -243,7 +256,9 @@ export default function App() {
             />
           );
         case 'jurnal':
-          return <JurnalMengajarView db={db} currentUser={currentUser} />;
+          return <JurnalMengajarView db={db} currentUser={currentUser} initialTab="agenda" />;
+        case 'rekap-jurnal':
+          return <JurnalMengajarView db={db} currentUser={currentUser} initialTab="rekap" />;
         case 'settings':
           return (
             <SchoolSettings
@@ -270,6 +285,8 @@ export default function App() {
       switch (activeMenu) {
         case 'dashboard':
           return <MuridDashboard db={db} currentUser={currentUser} onNavigate={handleNavigate} />;
+        case 'pengumuman':
+          return <MuridPengumumanView db={db} currentUser={currentUser} />;
         case 'materi-saya':
           return <MuridMateri db={db} currentUser={currentUser} initialMateriId={activeSubParam} />;
         case 'tugas-saya':

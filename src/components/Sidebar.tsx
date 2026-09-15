@@ -24,6 +24,8 @@ import {
   FileSpreadsheet,
   Sparkles,
   Camera,
+  Megaphone,
+  FileCheck,
 } from 'lucide-react';
 import { UserRole, User as UserType } from '../types';
 import { dataStorage } from '../services/dataStorage';
@@ -129,18 +131,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Pembelajaran & Asesmen',
       items: [
+        { id: 'pengumuman', label: 'Kelola Pengumuman', icon: <Megaphone className="w-5 h-5 text-amber-400" /> },
         { id: 'materi', label: 'Konten Materi', icon: <BookMarked className="w-5 h-5" /> },
         { id: 'tugas', label: 'Tugas PJOK', icon: <ClipboardList className="w-5 h-5" /> },
         { id: 'quiz', label: 'Quiz & Asesmen', icon: <CheckCircle className="w-5 h-5" /> },
         { id: 'praktik', label: 'Penilaian Praktik', icon: <Activity className="w-5 h-5" /> },
         { id: 'refleksi', label: 'Refleksi Pembelajaran', icon: <Sparkles className="w-5 h-5" /> },
         { id: 'jurnal', label: 'Jurnal Mengajar', icon: <FileText className="w-5 h-5" /> },
+        { id: 'rekap-jurnal', label: 'Rekapan Jurnal PJOK', icon: <FileSpreadsheet className="w-5 h-5 text-teal-400" /> },
       ],
     },
     {
       title: 'Laporan & Pengaturan',
       items: [
         { id: 'presensi', label: 'Presensi Siswa', icon: <CalendarCheck className="w-5 h-5" /> },
+        { id: 'pengajuan-izin', label: 'Pengajuan Surat Izin', icon: <FileCheck className="w-5 h-5 text-sky-400" /> },
         { id: 'rekap-absensi', label: 'Rekapan Absensi', icon: <FileSpreadsheet className="w-5 h-5 text-emerald-400" /> },
         { id: 'nilai', label: 'Penilaian & Rapor', icon: <Award className="w-5 h-5" /> },
         { id: 'profil-saya', label: 'Profil Saya', icon: <User className="w-5 h-5" /> },
@@ -159,6 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Pembelajaran',
       items: [
+        { id: 'pengumuman', label: 'Pengumuman Guru', icon: <Megaphone className="w-5 h-5 text-amber-400" /> },
         { id: 'data-murid', label: 'Data Siswa', icon: <GraduationCap className="w-5 h-5" /> },
         { id: 'materi', label: 'Materi PJOK', icon: <BookMarked className="w-5 h-5" /> },
         { id: 'tugas', label: 'Tugas PJOK', icon: <ClipboardList className="w-5 h-5" /> },
@@ -171,9 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'praktik', label: 'Penilaian Praktik', icon: <Activity className="w-5 h-5" /> },
         { id: 'refleksi', label: 'Refleksi Pembelajaran', icon: <Sparkles className="w-5 h-5" /> },
         { id: 'presensi', label: 'Presensi Siswa', icon: <UserCheck className="w-5 h-5" /> },
+        { id: 'pengajuan-izin', label: 'Pengajuan Surat Izin', icon: <FileCheck className="w-5 h-5 text-sky-400" /> },
         { id: 'rekap-absensi', label: 'Rekapan Absensi', icon: <FileSpreadsheet className="w-5 h-5 text-emerald-400" /> },
         { id: 'nilai', label: 'Rekap Nilai Siswa', icon: <Award className="w-5 h-5" /> },
         { id: 'jurnal', label: 'Jurnal Mengajar', icon: <FileText className="w-5 h-5" /> },
+        { id: 'rekap-jurnal', label: 'Rekapan Jurnal PJOK', icon: <FileSpreadsheet className="w-5 h-5 text-teal-400" /> },
       ],
     },
     {
@@ -195,6 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Aktivitas Belajar',
       items: [
+        { id: 'pengumuman', label: 'Pengumuman Guru', icon: <Megaphone className="w-5 h-5 text-amber-400" /> },
         { id: 'materi-saya', label: 'Materi Pembelajaran', icon: <BookMarked className="w-5 h-5" /> },
         { id: 'tugas-saya', label: 'Tugas Saya', icon: <ClipboardList className="w-5 h-5" /> },
         { id: 'quiz-saya', label: 'Quiz & Asesmen', icon: <CheckCircle className="w-5 h-5" /> },

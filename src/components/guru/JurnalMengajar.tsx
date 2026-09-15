@@ -15,16 +15,30 @@ import {
   CheckCircle2,
   LayoutGrid,
   Table,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { JurnalMengajar, User, getTeacherAssignedClasses } from '../../types';
 import { dataStorage, LMSDatabase } from '../../services/dataStorage';
+import { RekapJurnalView } from './RekapJurnalView';
 
 interface JurnalMengajarProps {
   db: LMSDatabase;
   currentUser: User;
+  initialTab?: 'agenda' | 'rekap';
 }
 
-export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentUser }) => {
+export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({
+  db,
+  currentUser,
+  initialTab = 'agenda',
+}) => {
+  const [activeTab, setActiveTab] = useState<'agenda' | 'rekap'>(initialTab);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const availableClasses = useMemo(() => {
     if (currentUser?.role === 'GURU') {
       const assigned = getTeacherAssignedClasses(currentUser, db.kelas);
@@ -150,79 +164,130 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
             Jurnal Mengajar Guru PJOK
           </h2>
           <p className="text-xs text-slate-500">
-            Dokumentasi agenda harian pembelajaran, materi gerak, kehadiran siswa, dan catatan refleksi
+            Dokumentasi agenda harian pembelajaran, materi gerak, kehadiran siswa, rekapan bulanan, dan evaluasi refleksi
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenAdd}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Tulis Jurnal Baru
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation Tabs: Agenda Harian vs Rekap Jurnal (Bulanan & Keseluruhan) */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-3">
         <button
-          onClick={handleOpenAdd}
-          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all"
+          type="button"
+          onClick={() => setActiveTab('agenda')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'agenda'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          Tulis Jurnal Baru
+          <FileText className="w-4 h-4" />
+          <span>Agenda & Catatan Harian</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'agenda' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {filteredJurnal.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('rekap')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'rekap'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Rekapan Jurnal (Bulanan & Keseluruhan)</span>
+          <span
+            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+              activeTab === 'rekap'
+                ? 'bg-amber-300 text-amber-950'
+                : 'bg-amber-100 text-amber-800'
+            }`}
+          >
+            Rekap & Cetak
+          </span>
         </button>
       </div>
 
-      {/* Filter and Actions Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="text-xs font-bold text-slate-600 shrink-0">Filter Kelas:</span>
-          <select
-            value={selectedFilterKelasId}
-            onChange={(e) => setSelectedFilterKelasId(e.target.value)}
-            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="ALL">
-              {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas'}
-            </option>
-            {availableClasses.map((k) => (
-              <option key={k.id} value={k.id}>
-                Kelas {k.nama} (Tingkat {k.tingkat})
-              </option>
-            ))}
-          </select>
-        </div>
+      {activeTab === 'rekap' ? (
+        <RekapJurnalView db={db} currentUser={currentUser} onOpenAdd={handleOpenAdd} />
+      ) : (
+        <>
+          {/* Filter and Actions Bar */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-600 shrink-0">Filter Kelas:</span>
+              <select
+                value={selectedFilterKelasId}
+                onChange={(e) => setSelectedFilterKelasId(e.target.value)}
+                className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="ALL">
+                  {currentUser?.role === 'GURU' ? 'Semua Kelas Diampu' : 'Semua Kelas'}
+                </option>
+                {availableClasses.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    Kelas {k.nama} (Tingkat {k.tingkat})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="flex items-center gap-3 self-end sm:self-center">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                viewMode === 'cards'
-                  ? 'bg-white text-emerald-700 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Kartu</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                viewMode === 'table'
-                  ? 'bg-white text-emerald-700 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Table className="w-3.5 h-3.5" />
-              <span>Tabel Kolom</span>
-            </button>
+            <div className="flex items-center gap-3 self-end sm:self-center">
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'cards'
+                      ? 'bg-white text-emerald-700 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Kartu</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    viewMode === 'table'
+                      ? 'bg-white text-emerald-700 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Table className="w-3.5 h-3.5" />
+                  <span>Tabel Kolom</span>
+                </button>
+              </div>
+
+              <div className="text-xs text-slate-500 font-semibold">
+                {filteredJurnal.length} Catatan
+              </div>
+            </div>
           </div>
 
-          <div className="text-xs text-slate-500 font-semibold">
-            {filteredJurnal.length} Catatan
-          </div>
-        </div>
-      </div>
-
-      {/* Jurnal View: Table or Cards */}
-      {filteredJurnal.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400">
-          Belum ada catatan jurnal mengajar untuk kelas ini. Klik tombol "Tulis Jurnal Baru" untuk menambahkan.
-        </div>
-      ) : viewMode === 'table' ? (
+          {/* Jurnal View: Table or Cards */}
+          {filteredJurnal.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400">
+              Belum ada catatan jurnal mengajar untuk kelas ini. Klik tombol "Tulis Jurnal Baru" untuk menambahkan.
+            </div>
+          ) : viewMode === 'table' ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -414,6 +479,8 @@ export const JurnalMengajarView: React.FC<JurnalMengajarProps> = ({ db, currentU
           ))}
         </div>
       )}
+    </>
+  )}
 
       {/* Add / Edit Modal */}
       {isModalOpen && (
